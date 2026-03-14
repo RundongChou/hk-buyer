@@ -24,13 +24,14 @@
 - 数据平台（TypeScript + TSX）：
   - 新增买手履约指标：`buyer_pending_applications`、`buyer_approved_total`、`task_timeout_unaccepted_72h`、等级分布。
   - 新增动态提价指标：`timeout_candidates_total`、`auto_markup_applied_total`、`task_redispatch_total`、`task_timeout_terminated_total`、`repriced_task_accept_rate`。
-  - 新增仓配清关指标：`warehouse_inbound_completed_total`、`customs_success_rate`、`shipment_signed_total`、`signed_within_7_15_days_rate`。
+  - 新增仓配清关指标：`warehouse_inbound_completed_total`、`customs_success_rate`、`compliance_clearance_success_rate`、`shipment_signed_total`、`signed_within_7_15_days_rate`。
 - 后端（Java 8 + Spring MVC）：
   - 新增买手入驻接口（`/api/v1/buyer/onboarding/applications`）与买手档案接口（`/api/v1/buyer/profile/{buyerId}`）。
   - 新增后台买手审核接口（`/api/v1/admin/buyer/onboarding/*`）与买手履约指标接口（`/api/v1/admin/metrics/buyer-fulfillment`）。
   - 新增超时任务自动提价引擎与管理接口：`/api/v1/admin/tasks/timeout-candidates`、`/api/v1/admin/tasks/timeout-reprice/run`、`/api/v1/admin/metrics/dynamic-pricing`。
   - 任务服务支持 24h 频控、最多 3 次自动提价、20% 封顶、重派计数与终止原因留痕。
   - 新增仓配清关履约接口：`/api/v1/admin/fulfillment/*`、`/api/v1/orders/{orderId}/fulfillment`、`/api/v1/admin/metrics/fulfillment`。
+  - Sprint 6 补强：入仓扫描必须基于已存在交仓记录，且交仓任务/买手与扫描请求强一致校验。
   - 订单状态新增 `CUSTOMS_CLEARANCE`，用于表达合规清关阶段。
 - MySQL：
   - 新增 `db/mysql/V4__sprint4_buyer_fulfillment.sql`，包含 `buyer_onboarding_application`、`buyer_profile`，并扩展 `procurement_task` 分层字段与索引。
@@ -62,6 +63,7 @@
 ## 风险与下一步
 - 风险：本地缺少 JDK8/Maven，后端自动化测试无法在当前机器完成。
 - 风险：Sprint 6 的清关与物流状态当前由后台人工回传，尚未接入关务/物流系统实时回调。
+- 风险：启用“先交仓后扫描”硬约束后，历史无交仓记录的测试单需先补录交仓才能入仓扫描。
 - 下一步建议：推进 `Roadmap Sprint 7`（售后与风控闭环：缺货替代、退款、真伪争议与仲裁）。
 
 ## Roadmap 对齐状态

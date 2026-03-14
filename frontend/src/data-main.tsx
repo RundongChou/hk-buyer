@@ -43,6 +43,7 @@ interface FulfillmentMetrics {
   customs_released_total: number;
   customs_rejected_total: number;
   customs_success_rate: number;
+  compliance_clearance_success_rate: number;
   shipment_in_transit_total: number;
   shipment_signed_total: number;
   signed_within_7_15_days_total: number;
@@ -183,6 +184,10 @@ function DataApp(): JSX.Element {
         <div>
           <div className="badge">customs_success_rate</div>
           <h2>{fulfillmentMetrics?.customs_success_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">compliance_clearance_success_rate</div>
+          <h2>{fulfillmentMetrics?.compliance_clearance_success_rate ?? '-'}</h2>
         </div>
         <div>
           <div className="badge">shipment_in_transit_total</div>

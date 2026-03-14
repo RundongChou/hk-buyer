@@ -96,17 +96,23 @@ public class FulfillmentService {
                 ? WAREHOUSE_INBOUND_COMPLETED
                 : WAREHOUSE_QC_FAILED;
 
-        LocalDateTime now = LocalDateTime.now();
-        if (!fulfillmentRepository.findInboundByOrderId(task.getOrderId()).isPresent()) {
-            fulfillmentRepository.upsertBuyerHandover(task.getOrderId(), taskId, task.getBuyerId(), normalizedWarehouseCode, now);
+        WarehouseInboundRecord existingInbound = fulfillmentRepository.findInboundByOrderId(task.getOrderId())
+                .orElseThrow(() -> new ApiException("buyer handover is required before inbound scan"));
+        if (existingInbound.getTaskId() == null || !existingInbound.getTaskId().equals(taskId)) {
+            throw new ApiException("inbound handover task does not match scan task");
+        }
+        if (existingInbound.getBuyerId() == null || !existingInbound.getBuyerId().equals(task.getBuyerId())) {
+            throw new ApiException("inbound handover buyer does not match accepted task buyer");
         }
 
+        String finalNote = trimToNull(qcNote);
+        LocalDateTime now = LocalDateTime.now();
         int affected = fulfillmentRepository.markInboundScan(
                 task.getOrderId(),
                 normalizedWarehouseCode,
                 warehouseStatus,
                 normalizedQcDecision,
-                trimToNull(qcNote),
+                finalNote,
                 now,
                 now
         );
@@ -114,7 +120,6 @@ public class FulfillmentService {
             throw new ApiException("inbound record not found for order: " + task.getOrderId());
         }
 
-        String finalNote = trimToNull(qcNote);
         if (QC_PASS.equals(normalizedQcDecision)) {
             orderService.updateOrderStatus(
                     task.getOrderId(),

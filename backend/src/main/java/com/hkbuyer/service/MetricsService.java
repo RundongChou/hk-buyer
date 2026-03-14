@@ -99,6 +99,7 @@ public class MetricsService {
         payload.put("customs_released_total", Long.valueOf(customsReleased));
         payload.put("customs_rejected_total", Long.valueOf(customsRejected));
         payload.put("customs_success_rate", Double.valueOf(customsSuccessRate));
+        payload.put("compliance_clearance_success_rate", Double.valueOf(customsSuccessRate));
         payload.put("shipment_in_transit_total", Long.valueOf(shipmentInTransit));
         payload.put("shipment_signed_total", Long.valueOf(shipmentSigned));
         payload.put("signed_within_7_15_days_total", Long.valueOf(signedWithinSevenToFifteenDays));
