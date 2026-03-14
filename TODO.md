@@ -4,9 +4,9 @@
 - 对应 Roadmap Sprint：1
 - PRD：`Roadmap.md` -> `## Roadmap Sprint 1 PRD（2026-03-14）`
 - 分支：main
-- Commit：待提交
-- Push 结果：待 push
-- CI 结果：未触发（本地执行）
+- Commit：`96ec883`（feat(sprint1): deliver roadmap sprint1 mvp loop with tsx frontend and spring mvc backend）
+- Push 结果：已成功 push 到 `origin/main`（`2d98044..96ec883`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
 - 当前项目现状：已具备前后端分离最小交易闭环代码骨架与 MySQL DDL。
 - 上一 Sprint 目标回顾：无（仓库此前无 Sprint 记录）
 - 上一 Sprint 是否按预期完成：N/A
