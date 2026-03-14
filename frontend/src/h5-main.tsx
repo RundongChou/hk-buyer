@@ -4,12 +4,6 @@ import { apiRequest } from './api';
 import { toOrderStatusLabel } from './status';
 import './styles.css';
 
-interface OrderCreateResponse {
-  orderId: number;
-  orderStatus: string;
-  totalAmount: string;
-}
-
 interface TimelineEvent {
   eventId: number;
   eventType: string;
@@ -30,14 +24,58 @@ interface CatalogSku {
   saleable: boolean;
 }
 
+interface CartItem {
+  cartItemId: number;
+  userId: number;
+  skuId: number;
+  qty: number;
+  selected: boolean;
+  updatedAt: string;
+  sku: CatalogSku;
+}
+
+interface CheckoutQuote {
+  userId: number;
+  goodsAmount: string;
+  couponDiscount: string;
+  taxAmount: string;
+  payableAmount: string;
+  taxRate: string;
+  coupon: {
+    couponCode: string;
+    couponName: string;
+    discountType: string;
+    discountAmount: string;
+    minOrderAmount: string;
+  } | null;
+  items: Array<{
+    skuId: number;
+    qty: number;
+    unitPrice: string;
+    lineAmount: string;
+  }>;
+}
+
+interface PayOrderResponse {
+  orderId: number;
+  orderStatus: string;
+  payStatus: string;
+  taskId?: number;
+  compensationToken?: string;
+  failureReason?: string;
+}
+
 function H5App(): JSX.Element {
   const [userId, setUserId] = useState('10001');
-  const [skuId, setSkuId] = useState('');
   const [qty, setQty] = useState('1');
-  const [unitPrice, setUnitPrice] = useState('');
   const [keyword, setKeyword] = useState('');
   const [catalogSkus, setCatalogSkus] = useState<CatalogSku[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [couponCode, setCouponCode] = useState('SPRINT3OFF20');
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
   const [orderId, setOrderId] = useState('');
+  const [paymentScenario, setPaymentScenario] = useState<'SUCCESS' | 'FAIL_TIMEOUT'>('SUCCESS');
+  const [compensationToken, setCompensationToken] = useState('');
   const [orderDetail, setOrderDetail] = useState<unknown>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [busy, setBusy] = useState(false);
@@ -61,42 +99,97 @@ function H5App(): JSX.Element {
     }
   };
 
-  const pickSku = (sku: CatalogSku): void => {
-    setSkuId(String(sku.skuId));
-    setUnitPrice(String(sku.finalPrice));
-    if (!sku.saleable) {
-      setMessage(`SKU ${sku.skuId} 当前缺货，仅可查看不可下单`);
-      return;
-    }
-    setMessage(`已选择 SKU ${sku.skuId}，将按系统价 ${sku.finalPrice} 下单`);
-  };
-
-  const createOrder = async (): Promise<void> => {
-    if (!skuId) {
-      setMessage('请先选择 SKU 或输入 SKU ID');
-      return;
-    }
+  const loadCart = async (): Promise<void> => {
     setBusy(true);
     setMessage('');
     try {
-      const itemPayload: Record<string, number> = {
-        skuId: Number(skuId),
-        qty: Number(qty)
-      };
-      const normalizedPrice = unitPrice.trim();
-      if (normalizedPrice) {
-        itemPayload.unitPrice = Number(normalizedPrice);
-      }
+      const payload = await apiRequest<CartItem[]>(`/api/v1/cart/items?userId=${Number(userId)}`);
+      setCartItems(payload);
+      setMessage(`购物车已刷新，共 ${payload.length} 项`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
-      const payload = await apiRequest<OrderCreateResponse>('/api/v1/orders', {
+  const addToCart = async (skuId: number): Promise<void> => {
+    setBusy(true);
+    setMessage('');
+    try {
+      await apiRequest('/api/v1/cart/items/upsert', {
         method: 'POST',
         body: {
           userId: Number(userId),
-          items: [itemPayload]
+          skuId,
+          qty: Number(qty)
+        }
+      });
+      setMessage(`已加入购物车：SKU ${skuId}`);
+      await loadCart();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeFromCart = async (skuId: number): Promise<void> => {
+    setBusy(true);
+    setMessage('');
+    try {
+      await apiRequest('/api/v1/cart/items/remove', {
+        method: 'POST',
+        body: {
+          userId: Number(userId),
+          skuId
+        }
+      });
+      setMessage(`已移除购物车 SKU ${skuId}`);
+      await loadCart();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const quoteCheckout = async (): Promise<void> => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const payload = await apiRequest<CheckoutQuote>('/api/v1/checkout/quote', {
+        method: 'POST',
+        body: {
+          userId: Number(userId),
+          couponCode: couponCode.trim() || undefined
+        }
+      });
+      setQuote(payload);
+      setMessage('结算报价已刷新');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createOrderFromCart = async (): Promise<void> => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const payload = await apiRequest<{ orderId: number; orderStatus: string; quote: CheckoutQuote }>('/api/v1/checkout/orders', {
+        method: 'POST',
+        body: {
+          userId: Number(userId),
+          couponCode: couponCode.trim() || undefined
         }
       });
       setOrderId(String(payload.orderId));
-      setMessage(`订单创建成功，状态：${toOrderStatusLabel(payload.orderStatus)}`);
+      setQuote(payload.quote);
+      setCompensationToken('');
+      setMessage(`购物车下单成功，状态：${toOrderStatusLabel(payload.orderStatus)}`);
+      await loadCart();
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -109,16 +202,54 @@ function H5App(): JSX.Element {
       setMessage('请先创建订单');
       return;
     }
+
     setBusy(true);
     setMessage('');
     try {
-      const payload = await apiRequest<{ orderStatus: string; taskId: number }>(`/api/v1/orders/${orderId}/pay`, {
+      const payload = await apiRequest<PayOrderResponse>(`/api/v1/orders/${orderId}/pay`, {
         method: 'POST',
         body: {
-          paymentChannel: 'WECHAT'
+          paymentChannel: 'WECHAT',
+          paymentScenario
         }
       });
-      setMessage(`支付成功，状态：${toOrderStatusLabel(payload.orderStatus)}，任务ID：${payload.taskId}`);
+
+      if (payload.payStatus === 'FAILED') {
+        setCompensationToken(payload.compensationToken ?? '');
+        setMessage(`支付失败：${payload.failureReason}，可发起补偿支付`);
+      } else {
+        setCompensationToken('');
+        setMessage(`支付成功，状态：${toOrderStatusLabel(payload.orderStatus)}，任务ID：${payload.taskId}`);
+      }
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const compensatePay = async (): Promise<void> => {
+    if (!orderId) {
+      setMessage('请先输入订单 ID');
+      return;
+    }
+    if (!compensationToken.trim()) {
+      setMessage('缺少补偿 token');
+      return;
+    }
+
+    setBusy(true);
+    setMessage('');
+    try {
+      const payload = await apiRequest<PayOrderResponse>(`/api/v1/orders/${orderId}/pay-compensate`, {
+        method: 'POST',
+        body: {
+          paymentChannel: 'WECHAT',
+          compensationToken: compensationToken.trim()
+        }
+      });
+      setCompensationToken('');
+      setMessage(`补偿支付成功，状态：${toOrderStatusLabel(payload.orderStatus)}，任务ID：${payload.taskId}`);
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -131,6 +262,7 @@ function H5App(): JSX.Element {
       setMessage('请先输入订单号');
       return;
     }
+
     setBusy(true);
     setMessage('');
     try {
@@ -148,7 +280,19 @@ function H5App(): JSX.Element {
 
   return (
     <div className="container">
-      <h1>H5 用户端</h1>
+      <h1>H5 用户端（交易稳态 V2）</h1>
+
+      <div className="card grid grid-2">
+        <label>
+          用户 ID
+          <input value={userId} onChange={(e) => setUserId(e.target.value)} />
+        </label>
+        <label>
+          加购数量
+          <input value={qty} onChange={(e) => setQty(e.target.value)} />
+        </label>
+      </div>
+
       <div className="card grid grid-2">
         <label>
           搜索关键词
@@ -164,8 +308,24 @@ function H5App(): JSX.Element {
         <pre>{JSON.stringify(catalogSkus, null, 2)}</pre>
         <div className="grid grid-2" style={{ marginTop: 12 }}>
           {catalogSkus.slice(0, 6).map((sku) => (
-            <button key={sku.skuId} onClick={() => pickSku(sku)} disabled={busy}>
-              选中 #{sku.skuId} {sku.skuName} / {sku.stockStatus}
+            <button key={sku.skuId} onClick={() => addToCart(sku.skuId)} disabled={busy || !sku.saleable}>
+              加购 #{sku.skuId} {sku.skuName} / {sku.stockStatus}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>购物车</h2>
+        <div className="grid grid-2">
+          <button onClick={loadCart} disabled={busy}>刷新购物车</button>
+          <button onClick={quoteCheckout} disabled={busy}>结算报价</button>
+        </div>
+        <pre>{JSON.stringify(cartItems, null, 2)}</pre>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          {cartItems.slice(0, 6).map((item) => (
+            <button key={item.cartItemId} onClick={() => removeFromCart(item.skuId)} disabled={busy}>
+              移除 #{item.skuId}
             </button>
           ))}
         </div>
@@ -173,32 +333,43 @@ function H5App(): JSX.Element {
 
       <div className="card grid grid-2">
         <label>
-          用户 ID
-          <input value={userId} onChange={(e) => setUserId(e.target.value)} />
+          优惠券
+          <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="如 SPRINT3OFF20" />
         </label>
-        <label>
-          SKU ID
-          <input value={skuId} onChange={(e) => setSkuId(e.target.value)} />
-        </label>
-        <label>
-          数量
-          <input value={qty} onChange={(e) => setQty(e.target.value)} />
-        </label>
-        <label>
-          单价（可选，优先走系统价）
-          <input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
-        </label>
+        <div style={{ alignSelf: 'end' }}>
+          <button onClick={createOrderFromCart} disabled={busy}>购物车下单</button>
+        </div>
       </div>
 
       <div className="card">
-        <div className="grid grid-2">
-          <button onClick={createOrder} disabled={busy}>创建订单</button>
-          <button onClick={payOrder} disabled={busy}>支付订单</button>
-        </div>
+        <h2>结算报价</h2>
+        <pre>{JSON.stringify(quote, null, 2)}</pre>
+      </div>
+
+      <div className="card grid grid-2">
         <label>
           订单 ID
           <input value={orderId} onChange={(e) => setOrderId(e.target.value)} />
         </label>
+        <label>
+          支付场景
+          <select value={paymentScenario} onChange={(e) => setPaymentScenario(e.target.value as 'SUCCESS' | 'FAIL_TIMEOUT')}>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="FAIL_TIMEOUT">FAIL_TIMEOUT</option>
+          </select>
+        </label>
+        <label>
+          补偿 Token
+          <input value={compensationToken} onChange={(e) => setCompensationToken(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="card grid grid-2">
+        <button onClick={payOrder} disabled={busy}>发起支付</button>
+        <button onClick={compensatePay} disabled={busy}>补偿支付</button>
+      </div>
+
+      <div className="card">
         <button onClick={loadOrder} disabled={busy}>刷新订单与时间线</button>
       </div>
 

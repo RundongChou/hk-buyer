@@ -23,6 +23,8 @@ public class MetricsService {
     public Map<String, Object> buildFunnelMetrics() {
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("payment_success", orderService.countPaidOrders());
+        payload.put("payment_failed", orderService.countPaymentFailedEvents());
+        payload.put("payment_compensated", orderService.countPaymentCompensatedEvents());
         payload.put("task_accepted", taskService.countAcceptedTasks());
         payload.put("proof_submitted", proofService.countSubmittedProofs());
         return payload;

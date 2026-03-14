@@ -1,6 +1,7 @@
 package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.CreateOrderRequest;
+import com.hkbuyer.api.dto.CompensatePayRequest;
 import com.hkbuyer.api.dto.PayOrderRequest;
 import com.hkbuyer.service.OrderService;
 import org.springframework.validation.annotation.Validated;
@@ -33,7 +34,13 @@ public class OrderController {
     @PostMapping("/{orderId}/pay")
     public Map<String, Object> payOrder(@PathVariable("orderId") Long orderId,
                                         @Valid @RequestBody PayOrderRequest request) {
-        return orderService.payOrder(orderId, request.getPaymentChannel());
+        return orderService.payOrder(orderId, request.getPaymentChannel(), request.getPaymentScenario());
+    }
+
+    @PostMapping("/{orderId}/pay-compensate")
+    public Map<String, Object> compensatePay(@PathVariable("orderId") Long orderId,
+                                             @Valid @RequestBody CompensatePayRequest request) {
+        return orderService.compensatePay(orderId, request.getPaymentChannel(), request.getCompensationToken());
     }
 
     @GetMapping("/{orderId}")

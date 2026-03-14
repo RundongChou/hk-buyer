@@ -2,11 +2,13 @@ package com.hkbuyer.api.dto;
 
 import javax.validation.constraints.NotBlank;
 
-public class PayOrderRequest {
+public class CompensatePayRequest {
 
     @NotBlank
     private String paymentChannel;
-    private String paymentScenario;
+
+    @NotBlank
+    private String compensationToken;
 
     public String getPaymentChannel() {
         return paymentChannel;
@@ -16,11 +18,11 @@ public class PayOrderRequest {
         this.paymentChannel = paymentChannel;
     }
 
-    public String getPaymentScenario() {
-        return paymentScenario;
+    public String getCompensationToken() {
+        return compensationToken;
     }
 
-    public void setPaymentScenario(String paymentScenario) {
-        this.paymentScenario = paymentScenario;
+    public void setCompensationToken(String compensationToken) {
+        this.compensationToken = compensationToken;
     }
 }

@@ -65,6 +65,11 @@ public class OrderRepository {
         jdbcTemplate.update(sql, OrderStatus.PAID_WAIT_ACCEPT.name(), orderId);
     }
 
+    public void markPayFailed(Long orderId) {
+        String sql = "UPDATE order_main SET pay_status = 'FAILED', order_status = ?, updated_at = NOW() WHERE order_id = ?";
+        jdbcTemplate.update(sql, OrderStatus.PENDING_PAYMENT.name(), orderId);
+    }
+
     public void updateStatus(Long orderId, OrderStatus status) {
         String sql = "UPDATE order_main SET order_status = ?, updated_at = NOW() WHERE order_id = ?";
         jdbcTemplate.update(sql, status.name(), orderId);

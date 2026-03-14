@@ -5,6 +5,8 @@ import './styles.css';
 
 interface FunnelMetrics {
   payment_success: number;
+  payment_failed: number;
+  payment_compensated: number;
   task_accepted: number;
   proof_submitted: number;
 }
@@ -52,6 +54,14 @@ function DataApp(): JSX.Element {
         <div>
           <div className="badge">payment_success</div>
           <h2>{funnelMetrics?.payment_success ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">payment_failed</div>
+          <h2>{funnelMetrics?.payment_failed ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">payment_compensated</div>
+          <h2>{funnelMetrics?.payment_compensated ?? '-'}</h2>
         </div>
         <div>
           <div className="badge">task_accepted</div>
