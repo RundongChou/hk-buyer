@@ -252,8 +252,8 @@
 - 对应 Roadmap Sprint：9
 - PRD：`Roadmap.md` -> `## Roadmap Sprint 9 PRD（2026-03-15）`
 - 分支：main
-- Commit：`dad0be6`（feat(sprint9): deliver growth and repurchase loop）
-- Push 结果：核心功能提交已成功 push 到 `origin/main`（`46fc875..dad0be6`）
+- Commit：`dad0be6`（feat(sprint9): deliver growth and repurchase loop）、`9406fec`（docs(sprint9): append sprint execution record）
+- Push 结果：已成功 push 到 `origin/main`（`46fc875..9406fec`，分两次 push：`46fc875..dad0be6`、`dad0be6..9406fec`）
 - CI 结果：未配置仓库 CI；本地前端测试已执行
 - 当前项目现状：已形成“会员分层 -> 运营活动触达 -> 券码归因下单 -> 复购推荐 -> 增长指标看板”最小闭环。
 - 上一 Sprint 目标回顾：交付 Roadmap Sprint 8 分账结算与财务对账 V1（自动分账、买手结算、平台费核算、对账报表）。
