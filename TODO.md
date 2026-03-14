@@ -245,3 +245,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 9（运营增长与复购 V1：会员权益、活动、推荐、触达）。
 - 下一 Sprint 验收标准：复购激励链路可演示，用户分层触达可配置，转化漏斗与复购指标可观测。
 - 勘误/补充说明：全程遵守合规边界，仅实现合规清关与合规结算流程，不实现任何绕关/走私能力。
+
+## Sprint 9
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：9
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 9 PRD（2026-03-15）`
+- 分支：main
+- Commit：`dad0be6`（feat(sprint9): deliver growth and repurchase loop）
+- Push 结果：核心功能提交已成功 push 到 `origin/main`（`46fc875..dad0be6`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已形成“会员分层 -> 运营活动触达 -> 券码归因下单 -> 复购推荐 -> 增长指标看板”最小闭环。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 8 分账结算与财务对账 V1（自动分账、买手结算、平台费核算、对账报表）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 后端自动化测试仍受本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 9 运营增长与复购 V1（会员权益、精准券包活动、推荐复购、增长指标）。
+- 本次实际完成：完成 Sprint 9 PRD；新增增长域后端服务与 API；新增活动触达与会员画像 MySQL 模型；H5/后台/数据平台完成增长功能联动；订单新增优惠券与活动归因字段。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V9__sprint9_growth_repurchase.sql`，创建 `user_membership_profile`、`growth_campaign`、`growth_campaign_touch`，并扩展 `order_main.applied_coupon_code/applied_campaign_id` 与增长归因索引。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`h5-main.tsx` 新增会员与复购增长中心；`admin-main.tsx` 新增活动创建与触达台；`data-main.tsx` 新增增长指标卡；全部改动为 TSX。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `GrowthController/GrowthService/GrowthRepository` 与 DTO（活动创建/发布）；扩展 `AdminController/MetricsService` 输出增长接口；扩展 `OrderService/OrderRepository` 写入订单增长归因。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：本 Sprint 不改供应链主链路，仅在交易后增长与复购侧增量扩展。
+- 本次验证与测试结果：`cd frontend && npm run test` 通过（1 文件 / 4 用例）；`cd frontend && npm run typecheck` 通过；`cd frontend && npm run build` 通过；`java -version` 失败（未安装 Java Runtime）；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 9 对齐，首单后复购触达链路可演示。
+- 架构师：前后端分离保持稳定，新增能力继续遵循 Java8 + SpringMVC + MySQL。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 环境补跑。
+- 运营：可在后台创建活动并按用户触达，数据平台可观察复购指标。
+- 用户：可查看会员权益与活动券包，并通过推荐商品快速复购。
+- 当前风险与技术债：缺少 JDK8/Maven 导致后端测试未执行；活动触达仅为站内记录未接外部通道；推荐算法为规则型 V1，需后续优化命中率。
+- 下一 Sprint 建议目标：Roadmap Sprint 10（稳态运营与优化 V1：A/B、监控告警、时效与成本优化）。
+- 下一 Sprint 验收标准：关键链路具备实验与监控能力，7-15 天履约达成率持续提升且 CCO-30 连续周期增长。
+- 勘误/补充说明：全程遵守合规边界，仅实现合规清关路径下的增长能力，不实现任何绕关/走私相关功能。
