@@ -86,6 +86,39 @@ interface AfterSaleCaseItem {
   createdAt: string;
 }
 
+interface SettlementLedger {
+  ledgerId: number;
+  orderId: number;
+  taskId: number;
+  buyerId: number;
+  buyerSettlementAccount: string | null;
+  orderAmount: string;
+  buyerIncomeAmount: string;
+  logisticsCostAmount: string;
+  platformServiceAmount: string;
+  settlementStatus: string;
+  reconciliationStatus: string;
+  exceptionReason: string | null;
+  payoutRequestedAt: string | null;
+  settledAt: string | null;
+  reconciledAt: string | null;
+  updatedAt: string;
+}
+
+interface SettlementReconciliationReport {
+  settlement_ledger_total: number;
+  settlement_pending_total: number;
+  settlement_payout_requested_total: number;
+  settlement_settled_total: number;
+  settlement_reconciliation_matched_total: number;
+  settlement_reconciliation_exception_total: number;
+  settlement_payout_completion_rate: number;
+  settlement_reconciliation_coverage_rate: number;
+  settlement_reconciliation_accuracy_rate: number;
+  settlement_order_amount_total: string;
+  settlement_platform_service_amount_total: string;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -142,6 +175,12 @@ function AdminApp(): JSX.Element {
   const [afterSaleDecision, setAfterSaleDecision] = useState('APPROVE_REPLACEMENT');
   const [afterSaleComment, setAfterSaleComment] = useState('同意按规则执行');
   const [finalRefundAmount, setFinalRefundAmount] = useState('20.00');
+  const [pendingPayoutSettlements, setPendingPayoutSettlements] = useState<SettlementLedger[]>([]);
+  const [settlementLedgerId, setSettlementLedgerId] = useState('');
+  const [settlementComment, setSettlementComment] = useState('人工复核通过，执行放款');
+  const [reconciliationDecision, setReconciliationDecision] = useState('MATCHED');
+  const [reconciliationExceptionReason, setReconciliationExceptionReason] = useState('到账金额与账单不一致');
+  const [reconciliationReport, setReconciliationReport] = useState<SettlementReconciliationReport | null>(null);
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -215,6 +254,27 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadPendingPayoutSettlements = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<SettlementLedger[]>('/api/v1/admin/settlements/pending-payout');
+      setPendingPayoutSettlements(payload);
+      if (!settlementLedgerId && payload.length > 0) {
+        setSettlementLedgerId(String(payload[0].ledgerId));
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
+  const loadReconciliationReport = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<SettlementReconciliationReport>('/api/v1/admin/settlements/reconciliation/report');
+      setReconciliationReport(payload);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
@@ -224,6 +284,8 @@ function AdminApp(): JSX.Element {
       await loadPendingBuyerApplications();
       await loadTimeoutCandidates();
       await loadPendingAfterSaleCases();
+      await loadPendingPayoutSettlements();
+      await loadReconciliationReport();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -535,6 +597,56 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const completeSettlementPayout = async (): Promise<void> => {
+    if (!settlementLedgerId) {
+      setMessage('请输入结算台账 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/admin/settlements/${settlementLedgerId}/complete-payout`, {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId),
+          comment: settlementComment.trim() || undefined
+        }
+      });
+      await loadPendingPayoutSettlements();
+      await loadReconciliationReport();
+      setMessage('结算放款已确认');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reconcileSettlementLedger = async (): Promise<void> => {
+    if (!settlementLedgerId) {
+      setMessage('请输入结算台账 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/admin/settlements/${settlementLedgerId}/reconcile`, {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId),
+          decision: reconciliationDecision,
+          exceptionReason: reconciliationDecision === 'EXCEPTION'
+            ? reconciliationExceptionReason.trim() || undefined
+            : undefined
+        }
+      });
+      await loadReconciliationReport();
+      setMessage(`对账结果已提交：${reconciliationDecision}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -724,6 +836,48 @@ function AdminApp(): JSX.Element {
           </label>
         </div>
         <button onClick={arbitrateAfterSaleCase} disabled={busy}>提交售后仲裁</button>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 8 财务结算与对账台</h2>
+        <div className="grid grid-2">
+          <button onClick={loadPendingPayoutSettlements} disabled={busy}>刷新待放款台账</button>
+          <button onClick={loadReconciliationReport} disabled={busy}>刷新对账报表</button>
+        </div>
+        <pre>{JSON.stringify(pendingPayoutSettlements, null, 2)}</pre>
+        <div className="grid grid-2">
+          <label>
+            结算台账 ID
+            <input value={settlementLedgerId} onChange={(e) => setSettlementLedgerId(e.target.value)} />
+          </label>
+          <label>
+            放款备注
+            <textarea value={settlementComment} onChange={(e) => setSettlementComment(e.target.value)} />
+          </label>
+        </div>
+        <div className="grid grid-2">
+          <button onClick={completeSettlementPayout} disabled={busy}>确认放款</button>
+          <div />
+        </div>
+        <div className="grid grid-2">
+          <label>
+            对账结果
+            <select value={reconciliationDecision} onChange={(e) => setReconciliationDecision(e.target.value)}>
+              <option value="MATCHED">MATCHED</option>
+              <option value="EXCEPTION">EXCEPTION</option>
+            </select>
+          </label>
+          <label>
+            异常原因
+            <textarea
+              value={reconciliationExceptionReason}
+              onChange={(e) => setReconciliationExceptionReason(e.target.value)}
+            />
+          </label>
+        </div>
+        <button onClick={reconcileSettlementLedger} disabled={busy}>提交对账结果</button>
+        <h3>对账报表</h3>
+        <pre>{JSON.stringify(reconciliationReport, null, 2)}</pre>
       </div>
 
       <div className="card grid grid-2">

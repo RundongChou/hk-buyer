@@ -1504,3 +1504,129 @@ NSM（CCO-30）贡献：
 3. 数据库：结构变更通过 MySQL 增量迁移脚本落地。
 4. 现状已与目标栈一致，本 Sprint 仅增量扩展，无需技术栈迁移。
 5. 合规边界：仅实现合规售后与争议处理，不实现任何绕关/走私相关设计。
+
+## Roadmap Sprint 8 PRD（2026-03-15）
+
+### 1. 背景与问题定义
+Roadmap Sprint 8 目标是“分账结算与财务对账 V1（自动分账、买手结算、平台费核算、对账报表）”。
+当前项目在 Sprint 7 已形成“下单 -> 履约 -> 售后”链路，但签收后的资金分配仍是缺口：
+1. 订单签收后没有结构化分账台账，无法审计“商品成本/买手收益/物流成本/平台服务费”的拆分结果。
+2. 买手端没有结算申请与状态查询入口，运营无法按工单状态执行放款。
+3. 管理后台没有标准化对账状态与报表，结算准确率无法量化追踪。
+
+### 2. Sprint 目标（可验证）
+1. 实现“订单签收 -> 自动生成分账台账”闭环，保证每个已签收订单最多一条结算台账且可追溯。
+2. 实现“买手发起结算 -> 后台确认放款 -> 对账标记”闭环，覆盖 `PENDING -> PAYOUT_REQUESTED -> SETTLED` 主状态。
+3. 提供管理后台对账报表与数据平台指标，输出结算准确率、待结算规模、对账异常规模。
+4. 所有改动保持 `TypeScript + TSX / Java 8 + Spring MVC / MySQL`，仅走合规清关和合规财务路径。
+
+### 3. 非目标（明确不做）
+1. 不接入真实第三方支付清算回调与银行出款通道（本 Sprint 仅做平台内账务状态流转）。
+2. 不做发票管理与税务申报自动化。
+3. 不做复杂财务会计分录引擎（总账/明细账分层留到后续）。
+4. 不实现任何绕关/走私相关能力，继续只支持合规跨境履约后结算。
+
+### 4. 用户故事与使用场景
+1. 买手端：作为已履约买手，我希望在订单签收后看到可结算账单，并能提交结算申请。
+2. 管理后台：作为财务/运营，我希望查看待处理结算，完成放款确认并记录对账结果。
+3. 数据平台：作为经营分析人员，我希望查看结算总量、放款完成率、对账准确率，用于评估商业可持续性。
+
+### 5. 范围（In Scope / Out of Scope）
+In Scope：
+1. MySQL 结算台账模型 `settlement_ledger` 与必要索引。
+2. 订单签收后自动分账逻辑（按固定比例 + 边界保护生成台账）。
+3. 买手结算查询与申请接口，后台放款确认与对账接口。
+4. 后台对账报表接口与数据平台结算指标接口。
+5. 买手端/管理后台/数据平台 TSX 页面改造。
+
+Out of Scope：
+1. 真实资金打款、三方支付清算回单。
+2. 会计凭证导出与税务申报。
+3. 多币种汇率折算和跨主体合并报表。
+
+### 6. 功能需求清单（FR）
+1. FR-S8-01：当订单状态进入 `SIGNED` 时，系统自动创建结算台账（幂等）。
+2. FR-S8-02：结算台账需记录 `order_id/task_id/buyer_id` 及分账金额（商品成本、买手收益、物流成本、平台服务费）。
+3. FR-S8-03：买手可按 `buyerId` 查询自己的结算台账，并对 `PENDING` 台账提交结算申请。
+4. FR-S8-04：后台可查询待放款台账，并将台账从 `PAYOUT_REQUESTED` 更新为 `SETTLED`。
+5. FR-S8-05：后台可为 `SETTLED` 台账提交对账结果（`MATCHED` / `EXCEPTION`）并记录备注。
+6. FR-S8-06：后台可查询结算对账报表，至少包含总台账数、已放款数、已对账数、异常数、对账准确率。
+7. FR-S8-07：数据平台可读取结算指标，展示结算完成率与对账准确率。
+
+### 7. 数据与接口变更（MySQL）
+1. 新增迁移：`db/mysql/V8__sprint8_settlement_finance.sql`。
+2. 新增表：`settlement_ledger`，核心字段：
+   - 关联字段：`order_id`、`task_id`、`buyer_id`、`buyer_settlement_account`
+   - 金额字段：`order_amount`、`goods_cost_amount`、`buyer_income_amount`、`logistics_cost_amount`、`platform_service_amount`
+   - 状态字段：`settlement_status`、`reconciliation_status`、`exception_reason`
+   - 时间字段：`signed_at`、`payout_requested_at`、`settled_at`、`reconciled_at`、`created_at/updated_at`
+3. 新增索引：
+   - `uk_settlement_order`（唯一）
+   - `idx_settlement_buyer_status`
+   - `idx_settlement_status_recon`
+4. 扩展 `buyer_profile`：新增 `settlement_account` 字段，并由入驻审核通过时同步更新。
+5. 新增/变更 API（Spring MVC）：
+   - `GET /api/v1/buyer/settlements?buyerId={buyerId}`
+   - `POST /api/v1/buyer/settlements/{ledgerId}/request-payout`
+   - `GET /api/v1/admin/settlements/pending-payout`
+   - `POST /api/v1/admin/settlements/{ledgerId}/complete-payout`
+   - `POST /api/v1/admin/settlements/{ledgerId}/reconcile`
+   - `GET /api/v1/admin/settlements/reconciliation/report`
+   - `GET /api/v1/admin/metrics/settlement`
+
+### 8. 前端交互与页面变更（TypeScript + JSX）
+1. 买手端 `buyer-main.tsx`：新增“结算中心”区块，支持查询台账和提交结算申请。
+2. 管理后台 `admin-main.tsx`：新增“财务结算与对账台”，支持待放款查询、放款确认、对账提交、报表查看。
+3. 数据平台 `data-main.tsx`：新增结算指标卡与原始 JSON 展示。
+4. 所有前端变更必须为 TypeScript + TSX，不新增纯 JavaScript 页面。
+
+### 9. 后端实现变更（Java8 + SpringMVC）
+1. 新增 `SettlementLedger` 领域模型、`SettlementRepository`、`SettlementService`。
+2. 在履约签收节点（`FulfillmentService.updateShipment` 的 `SIGNED` 分支）调用自动分账逻辑，生成结算台账。
+3. 扩展 `BuyerController` 与 `AdminController` 提供 Sprint 8 结算接口。
+4. 扩展 `MetricsService` 输出结算指标，并与对账报表口径一致。
+5. 保持 Java 8 + Spring MVC + JDBC，不引入偏离技术栈组件。
+
+### 10. 测试计划与验收标准（DoD）
+测试计划：
+1. 前端：`cd frontend && npm run test && npm run typecheck && npm run build`。
+2. 后端：`mvn -f backend/pom.xml test`（若环境缺少 JDK8/Maven，记录阻塞和补跑建议）。
+3. 业务冒烟：
+   - 订单签收后自动生成台账；
+   - 买手提交结算申请 -> 后台完成放款 -> 提交对账结果；
+   - 管理后台报表和数据平台指标可见。
+
+DoD：
+1. 至少一条“签收 -> 自动分账 -> 结算完成 -> 对账完成”链路可演示。
+2. 结算台账满足幂等性（同一订单不重复创建）。
+3. 买手端/后台/数据平台均具备对应 Sprint 8 操作与展示能力。
+4. 文档（Roadmap/README/TODO）和 Git（commit + push）记录完整。
+
+### 11. 风险与回滚方案
+1. 风险：固定比例分账与真实业务规则存在偏差。
+   回滚：保留台账结构不变，策略参数可在后续 Sprint 调整；当前明确标记为 V1 规则。
+2. 风险：结算状态流转被重复调用。
+   回滚：接口增加状态前置校验与幂等约束，异常时返回可读错误。
+3. 风险：对账异常积压导致人工处理延迟。
+   回滚：保留 `EXCEPTION` 状态和异常原因字段，支持后续批量复核。
+4. 风险：本机缺少 JDK8/Maven，后端自动化测试无法执行。
+   回滚/缓解：在具备 Java8 + Maven 的 CI 或开发机补跑后端测试。
+
+### 12. 与北极星指标映射（本 Sprint 如何贡献 CCO-30 与护栏）
+NSM（CCO-30）贡献：
+1. Sprint 8 补齐“签收后结算”环节，保障闭环订单可持续运营，减少因结算不可执行导致的供给萎缩，间接提升 CCO-30 稳定增长。
+
+护栏映射：
+1. 假货投诉率：本 Sprint 不新增争议逻辑，沿用 Sprint 7 仲裁与证据链能力。
+2. 72h 超时未接单率：本 Sprint 不改派单，沿用 Sprint 5 动态提价机制。
+3. 订单取消率：结算确定性提升买手履约意愿，降低后置争议导致的取消风险。
+4. 7-15天履约达成率：签收后快速结算提升买手积极性，间接支持时效稳定。
+5. 合规清关成功率：不改变清关流程，仅在签收后财务侧补齐闭环。
+6. 用户NPS：签收后售后与结算响应更稳定，提升平台可信度。
+
+### 13. 技术栈符合性与迁移策略
+1. 前端：本 Sprint 页面改动全部使用 TypeScript + TSX。
+2. 后端：本 Sprint 接口与服务全部使用 Java 8 + Spring MVC。
+3. 数据库：结构变更通过 MySQL 增量迁移脚本落地。
+4. 现状与目标栈一致，无需技术栈迁移；仅进行增量扩展。
+5. 合规边界：仅实现合规履约后的财务结算与对账，不实现任何绕关/走私相关设计。

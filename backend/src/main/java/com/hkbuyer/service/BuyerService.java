@@ -158,6 +158,7 @@ public class BuyerService {
         payload.put("rejectedProofCount", profile.getRejectedProofCount());
         payload.put("serviceRegion", profile.getServiceRegion());
         payload.put("specialtyCategory", profile.getSpecialtyCategory());
+        payload.put("settlementAccount", profile.getSettlementAccount());
         payload.put("lastActiveAt", profile.getLastActiveAt());
         payload.put("updatedAt", profile.getUpdatedAt());
         return payload;

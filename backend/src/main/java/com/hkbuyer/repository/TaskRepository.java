@@ -68,6 +68,18 @@ public class TaskRepository {
         return Optional.of(tasks.get(0));
     }
 
+    public Optional<ProcurementTask> findByOrderId(Long orderId) {
+        String sql = "SELECT task_id, order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
+                "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +
+                "last_markup_at, next_markup_eligible_at, terminal_reason, accepted_at, updated_at " +
+                "FROM procurement_task WHERE order_id = ? ORDER BY task_id DESC LIMIT 1";
+        List<ProcurementTask> tasks = jdbcTemplate.query(sql, taskRowMapper(), orderId);
+        if (tasks.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(tasks.get(0));
+    }
+
     public List<ProcurementTask> listPublishedTasks() {
         String sql = "SELECT task_id, order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
                 "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +

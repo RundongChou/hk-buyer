@@ -3,7 +3,7 @@
 香港买手跨境代购平台（前后端分离）单仓工程。
 
 ## 当前完成度
-- 当前已完成到 `Roadmap Sprint 7`，可演示“交易 -> 买手履约 -> 动态提价 -> 仓配清关 -> 售后仲裁”主链路：
+- 当前已完成到 `Roadmap Sprint 8`，可演示“交易 -> 买手履约 -> 动态提价 -> 仓配清关 -> 售后仲裁 -> 分账结算/对账”主链路：
   - Sprint 1：下单/支付/任务发布/接单/凭证审核/时间线。
   - Sprint 2：商品与库存中台（SPU/SKU、上架审核、缺货预警）。
   - Sprint 3：购物车、优惠券、税费估算、支付失败补偿。
@@ -11,30 +11,29 @@
   - Sprint 5：72h 超时自动提价重派与终止规则。
   - Sprint 6：交仓、入仓质检、合规清关、物流回传、签收指标。
   - Sprint 7：缺货工单、用户替代/部分退款决策、真伪争议、后台仲裁与风控指标。
+  - Sprint 8：签收后自动分账、买手结算申请、后台放款确认、对账报表与结算指标。
 
-## 新增能力（Sprint 7）
+## 新增能力（Sprint 8）
 - 买手端（TypeScript + TSX）：
-  - 新增缺货上报：`POST /api/v1/buyer/tasks/{taskId}/stockout-report`。
-  - 支持填写缺货原因、替代建议、建议部分退款金额。
-- 用户端 H5（TypeScript + TSX）：
-  - 新增售后中心：发起真伪争议、查看售后工单、提交缺货方案决策。
+  - 新增结算中心：查询买手台账并提交放款申请。
   - 新增接口对接：
-    - `POST /api/v1/orders/{orderId}/after-sale/authenticity`
-    - `GET /api/v1/orders/{orderId}/after-sale/cases`
-    - `POST /api/v1/orders/{orderId}/after-sale/cases/{caseId}/decision`
+    - `GET /api/v1/buyer/settlements`
+    - `POST /api/v1/buyer/settlements/{ledgerId}/request-payout`
 - 管理后台（TypeScript + TSX）：
-  - 新增售后与风控仲裁台：待仲裁工单查询与仲裁提交。
+  - 新增财务结算与对账台：待放款台账查询、放款确认、对账提交、报表查看。
   - 新增接口对接：
-    - `GET /api/v1/admin/after-sale/cases/pending`
-    - `POST /api/v1/admin/after-sale/cases/{caseId}/arbitrate`
+    - `GET /api/v1/admin/settlements/pending-payout`
+    - `POST /api/v1/admin/settlements/{ledgerId}/complete-payout`
+    - `POST /api/v1/admin/settlements/{ledgerId}/reconcile`
+    - `GET /api/v1/admin/settlements/reconciliation/report`
 - 数据平台（TypeScript + TSX）：
-  - 新增售后风控指标：`after_sale_open_cases_total`、`after_sale_pending_arbitration_total`、`after_sale_resolved_total`、`counterfeit_complaint_rate`、`order_cancel_rate`。
+  - 新增结算指标：`settlement_ledger_total`、`settlement_pending_total`、`settlement_payout_requested_total`、`settlement_settled_total`、`settlement_completion_rate`、`settlement_reconciliation_accuracy_rate`。
 - 后端（Java 8 + Spring MVC）：
-  - 新增 `AfterSaleService`、`AfterSaleRepository`、`AfterSaleCase`。
-  - 新增订单状态 `AFTER_SALE_PROCESSING`，实现售后工单流程与时间线留痕。
-  - 扩展 `MetricsService` 输出 `after-sale-risk` 指标。
+  - 新增 `SettlementService`、`SettlementRepository`、`SettlementLedger`。
+  - 在签收节点自动生成分账台账，形成“签收 -> 分账”自动化链路。
+  - 扩展 `BuyerController`/`AdminController`/`MetricsService` 输出结算与对账接口。
 - MySQL：
-  - 新增 `db/mysql/V7__sprint7_after_sale_risk.sql`，落地 `after_sale_case` 表与索引。
+  - 新增 `db/mysql/V8__sprint8_settlement_finance.sql`，落地 `settlement_ledger` 表与索引，并扩展 `buyer_profile.settlement_account`。
 
 ## 关键入口
 - 用户端入口：[h5-main.tsx](/Users/yinbin/PycharmProjects/hk-buyer/frontend/src/h5-main.tsx)
@@ -45,6 +44,7 @@
 - 订单与售后入口：[OrderController.java](/Users/yinbin/PycharmProjects/hk-buyer/backend/src/main/java/com/hkbuyer/api/OrderController.java)
 - 买手任务入口：[BuyerTaskController.java](/Users/yinbin/PycharmProjects/hk-buyer/backend/src/main/java/com/hkbuyer/api/BuyerTaskController.java)
 - 管理后台入口：[AdminController.java](/Users/yinbin/PycharmProjects/hk-buyer/backend/src/main/java/com/hkbuyer/api/AdminController.java)
+- 结算服务入口：[SettlementService.java](/Users/yinbin/PycharmProjects/hk-buyer/backend/src/main/java/com/hkbuyer/service/SettlementService.java)
 - MySQL 配置：[application.yml](/Users/yinbin/PycharmProjects/hk-buyer/backend/src/main/resources/application.yml)
 
 ## 运行与测试状态（2026-03-15）
@@ -59,12 +59,12 @@
 
 ## 风险与下一步
 - 风险：当前机器缺少 JDK8/Maven，后端自动化测试无法本地执行。
-- 风险：Sprint 7 已实现工单与仲裁留痕，但未接入真实退款资金落账与财务对账。
+- 风险：Sprint 8 仅实现平台内结算状态流转，尚未接入真实出款/支付清算回单。
 - 风险：清关与物流仍为后台人工回传，未接关务/物流实时回调。
-- 下一步建议：推进 `Roadmap Sprint 8`（分账结算与财务对账闭环）。
+- 下一步建议：推进 `Roadmap Sprint 9`（运营增长与复购触达）。
 
 ## Roadmap 对齐状态
-- 当前做到：`Roadmap Sprint 7`。
+- 当前做到：`Roadmap Sprint 8`。
 - 合规边界：仅实现合规清关与售后风控流程，不实现任何绕关/走私能力。
 
 ## 技术栈符合性

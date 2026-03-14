@@ -15,6 +15,7 @@ public class BuyerProfile {
     private Integer rejectedProofCount;
     private String serviceRegion;
     private String specialtyCategory;
+    private String settlementAccount;
     private LocalDateTime lastActiveAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -113,6 +114,14 @@ public class BuyerProfile {
 
     public void setSpecialtyCategory(String specialtyCategory) {
         this.specialtyCategory = specialtyCategory;
+    }
+
+    public String getSettlementAccount() {
+        return settlementAccount;
+    }
+
+    public void setSettlementAccount(String settlementAccount) {
+        this.settlementAccount = settlementAccount;
     }
 
     public LocalDateTime getLastActiveAt() {

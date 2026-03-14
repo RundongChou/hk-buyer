@@ -34,13 +34,36 @@ interface BuyerProfile {
   rejectedProofCount: number;
   serviceRegion: string;
   specialtyCategory: string;
+  settlementAccount: string | null;
   lastActiveAt: string | null;
+  updatedAt: string;
+}
+
+interface SettlementLedger {
+  ledgerId: number;
+  orderId: number;
+  taskId: number;
+  buyerId: number;
+  buyerSettlementAccount: string | null;
+  orderAmount: string;
+  goodsCostAmount: string;
+  buyerIncomeAmount: string;
+  logisticsCostAmount: string;
+  platformServiceAmount: string;
+  settlementStatus: string;
+  reconciliationStatus: string;
+  exceptionReason: string | null;
+  signedAt: string;
+  payoutRequestedAt: string | null;
+  settledAt: string | null;
+  reconciledAt: string | null;
   updatedAt: string;
 }
 
 function BuyerApp(): JSX.Element {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [profile, setProfile] = useState<BuyerProfile | null>(null);
+  const [settlements, setSettlements] = useState<SettlementLedger[]>([]);
   const [taskId, setTaskId] = useState('');
   const [buyerId, setBuyerId] = useState('30001');
   const [realName, setRealName] = useState('陈买手');
@@ -57,6 +80,8 @@ function BuyerApp(): JSX.Element {
   const [replacementSkuName, setReplacementSkuName] = useState('港版维C精华 20ml');
   const [suggestedRefundAmount, setSuggestedRefundAmount] = useState('20.00');
   const [warehouseCode, setWarehouseCode] = useState('HK-WH-01');
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState('');
+  const [payoutLedgerId, setPayoutLedgerId] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -80,6 +105,7 @@ function BuyerApp(): JSX.Element {
     void (async () => {
       await loadBuyerProfile();
       await loadTasks();
+      await loadSettlements();
     })();
   }, []);
 
@@ -110,9 +136,53 @@ function BuyerApp(): JSX.Element {
     try {
       const payload = await apiRequest<BuyerProfile>(`/api/v1/buyer/profile/${Number(buyerId)}`);
       setProfile(payload);
+      if (payload.settlementAccount) {
+        setSettlementAccount(payload.settlementAccount);
+      }
       setMessage(`买手档案已刷新，当前等级：${payload.buyerLevel}`);
     } catch (error) {
       setProfile(null);
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadSettlements = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const query = settlementStatusFilter.trim()
+        ? `?buyerId=${Number(buyerId)}&settlementStatus=${encodeURIComponent(settlementStatusFilter.trim().toUpperCase())}`
+        : `?buyerId=${Number(buyerId)}`;
+      const payload = await apiRequest<SettlementLedger[]>(`/api/v1/buyer/settlements${query}`);
+      setSettlements(payload);
+      if (!payoutLedgerId && payload.length > 0) {
+        setPayoutLedgerId(String(payload[0].ledgerId));
+      }
+      setMessage(`结算台账已刷新，共 ${payload.length} 条`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestPayout = async (): Promise<void> => {
+    if (!payoutLedgerId) {
+      setMessage('请输入结算台账 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/buyer/settlements/${payoutLedgerId}/request-payout`, {
+        method: 'POST',
+        body: {
+          buyerId: Number(buyerId)
+        }
+      });
+      await loadSettlements();
+      setMessage('结算申请已提交，等待后台放款');
+    } catch (error) {
       setMessage(String(error));
     } finally {
       setBusy(false);
@@ -319,6 +389,29 @@ function BuyerApp(): JSX.Element {
 
       <div className="card">
         <button onClick={submitHandover} disabled={busy}>提交交仓登记</button>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 8 结算中心</h2>
+        <div className="grid grid-2">
+          <label>
+            结算状态筛选
+            <input
+              value={settlementStatusFilter}
+              onChange={(e) => setSettlementStatusFilter(e.target.value)}
+              placeholder="可选: PENDING / PAYOUT_REQUESTED / SETTLED"
+            />
+          </label>
+          <button onClick={loadSettlements} disabled={busy}>刷新结算台账</button>
+        </div>
+        <pre>{JSON.stringify(settlements, null, 2)}</pre>
+        <div className="grid grid-2">
+          <label>
+            台账 ID
+            <input value={payoutLedgerId} onChange={(e) => setPayoutLedgerId(e.target.value)} />
+          </label>
+          <button onClick={requestPayout} disabled={busy}>提交结算申请</button>
+        </div>
       </div>
 
       <div className="card">

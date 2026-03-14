@@ -35,13 +35,16 @@ public class FulfillmentService {
     private final FulfillmentRepository fulfillmentRepository;
     private final TaskRepository taskRepository;
     private final OrderService orderService;
+    private final SettlementService settlementService;
 
     public FulfillmentService(FulfillmentRepository fulfillmentRepository,
                               TaskRepository taskRepository,
-                              OrderService orderService) {
+                              OrderService orderService,
+                              SettlementService settlementService) {
         this.fulfillmentRepository = fulfillmentRepository;
         this.taskRepository = taskRepository;
         this.orderService = orderService;
+        this.settlementService = settlementService;
     }
 
     @Transactional
@@ -243,6 +246,7 @@ public class FulfillmentService {
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime signedAt = SHIPMENT_SIGNED.equals(normalizedShipmentStatus) ? now : null;
+        Map<String, Object> settlementPayload = null;
 
         fulfillmentRepository.upsertShipment(
                 orderId,
@@ -261,6 +265,7 @@ public class FulfillmentService {
                     "shipment_signed",
                     "用户已签收，运单号: " + normalizedTrackingNo
             );
+            settlementPayload = settlementService.ensureLedgerForSignedOrder(orderId, signedAt);
         } else {
             orderService.updateOrderStatus(
                     orderId,
@@ -278,6 +283,7 @@ public class FulfillmentService {
         payload.put("orderStatus", SHIPMENT_SIGNED.equals(normalizedShipmentStatus)
                 ? OrderStatus.SIGNED.name()
                 : OrderStatus.IN_TRANSIT.name());
+        payload.put("settlement", settlementPayload);
         return payload;
     }
 

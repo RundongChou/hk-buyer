@@ -79,13 +79,15 @@ public class BuyerRepository {
     public void upsertApprovedProfile(BuyerOnboardingApplication application) {
         String sql = "INSERT INTO buyer_profile(" +
                 "buyer_id, display_name, audit_status, buyer_level, credit_score, reward_points, penalty_points, accepted_task_count, " +
-                "approved_proof_count, rejected_proof_count, service_region, specialty_category, last_active_at, created_at, updated_at) " +
-                "VALUES(?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, NOW(), NOW(), NOW()) " +
+                "approved_proof_count, rejected_proof_count, service_region, specialty_category, settlement_account, " +
+                "last_active_at, created_at, updated_at) " +
+                "VALUES(?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?, ?, ?, NOW(), NOW(), NOW()) " +
                 "ON DUPLICATE KEY UPDATE " +
                 "display_name = VALUES(display_name), " +
                 "audit_status = VALUES(audit_status), " +
                 "service_region = VALUES(service_region), " +
                 "specialty_category = VALUES(specialty_category), " +
+                "settlement_account = VALUES(settlement_account), " +
                 "updated_at = NOW()";
         jdbcTemplate.update(sql,
                 application.getBuyerId(),
@@ -94,7 +96,8 @@ public class BuyerRepository {
                 BuyerLevel.BRONZE.name(),
                 Integer.valueOf(DEFAULT_CREDIT_SCORE),
                 application.getServiceRegion(),
-                application.getSpecialtyCategory());
+                application.getSpecialtyCategory(),
+                application.getSettlementAccount());
     }
 
     public void markProfileRejected(Long buyerId) {
@@ -104,7 +107,8 @@ public class BuyerRepository {
 
     public Optional<BuyerProfile> findProfileByBuyerId(Long buyerId) {
         String sql = "SELECT buyer_id, display_name, audit_status, buyer_level, credit_score, reward_points, penalty_points, accepted_task_count, " +
-                "approved_proof_count, rejected_proof_count, service_region, specialty_category, last_active_at, created_at, updated_at " +
+                "approved_proof_count, rejected_proof_count, service_region, specialty_category, settlement_account, " +
+                "last_active_at, created_at, updated_at " +
                 "FROM buyer_profile WHERE buyer_id = ?";
         List<BuyerProfile> rows = jdbcTemplate.query(sql, buyerProfileRowMapper(), buyerId);
         if (rows.isEmpty()) {
@@ -201,6 +205,7 @@ public class BuyerRepository {
             item.setRejectedProofCount(Integer.valueOf(rs.getInt("rejected_proof_count")));
             item.setServiceRegion(rs.getString("service_region"));
             item.setSpecialtyCategory(rs.getString("specialty_category"));
+            item.setSettlementAccount(rs.getString("settlement_account"));
             Timestamp lastActiveAt = rs.getTimestamp("last_active_at");
             Timestamp createdAt = rs.getTimestamp("created_at");
             Timestamp updatedAt = rs.getTimestamp("updated_at");

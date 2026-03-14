@@ -15,19 +15,22 @@ public class MetricsService {
     private final BuyerService buyerService;
     private final FulfillmentService fulfillmentService;
     private final AfterSaleService afterSaleService;
+    private final SettlementService settlementService;
 
     public MetricsService(OrderService orderService,
                           TaskService taskService,
                           ProofService proofService,
                           BuyerService buyerService,
                           FulfillmentService fulfillmentService,
-                          AfterSaleService afterSaleService) {
+                          AfterSaleService afterSaleService,
+                          SettlementService settlementService) {
         this.orderService = orderService;
         this.taskService = taskService;
         this.proofService = proofService;
         this.buyerService = buyerService;
         this.fulfillmentService = fulfillmentService;
         this.afterSaleService = afterSaleService;
+        this.settlementService = settlementService;
     }
 
     public Map<String, Object> buildFunnelMetrics() {
@@ -139,6 +142,37 @@ public class MetricsService {
         payload.put("partial_refund_approved_total", Long.valueOf(partialRefundApproved));
         payload.put("order_cancelled_total", Long.valueOf(cancelledOrders));
         payload.put("order_cancel_rate", Double.valueOf(orderCancelRate));
+        return payload;
+    }
+
+    public Map<String, Object> buildSettlementMetrics() {
+        long settlementLedgerTotal = settlementService.countTotalLedgers();
+        long settlementPendingTotal = settlementService.countPendingLedgers();
+        long settlementPayoutRequestedTotal = settlementService.countPayoutRequestedLedgers();
+        long settlementSettledTotal = settlementService.countSettledLedgers();
+        long settlementReconciliationMatchedTotal = settlementService.countReconciliationMatchedLedgers();
+        long settlementReconciliationExceptionTotal = settlementService.countReconciliationExceptionLedgers();
+
+        double settlementCompletionRate = 0D;
+        if (settlementLedgerTotal > 0L) {
+            settlementCompletionRate = (settlementSettledTotal * 1.0D) / settlementLedgerTotal;
+        }
+
+        long reconciliationProcessedTotal = settlementReconciliationMatchedTotal + settlementReconciliationExceptionTotal;
+        double settlementReconciliationAccuracyRate = 0D;
+        if (reconciliationProcessedTotal > 0L) {
+            settlementReconciliationAccuracyRate = (settlementReconciliationMatchedTotal * 1.0D) / reconciliationProcessedTotal;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("settlement_ledger_total", Long.valueOf(settlementLedgerTotal));
+        payload.put("settlement_pending_total", Long.valueOf(settlementPendingTotal));
+        payload.put("settlement_payout_requested_total", Long.valueOf(settlementPayoutRequestedTotal));
+        payload.put("settlement_settled_total", Long.valueOf(settlementSettledTotal));
+        payload.put("settlement_reconciliation_matched_total", Long.valueOf(settlementReconciliationMatchedTotal));
+        payload.put("settlement_reconciliation_exception_total", Long.valueOf(settlementReconciliationExceptionTotal));
+        payload.put("settlement_completion_rate", Double.valueOf(settlementCompletionRate));
+        payload.put("settlement_reconciliation_accuracy_rate", Double.valueOf(settlementReconciliationAccuracyRate));
         return payload;
     }
 }

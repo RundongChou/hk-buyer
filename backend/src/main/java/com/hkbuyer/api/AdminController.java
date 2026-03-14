@@ -3,7 +3,9 @@ package com.hkbuyer.api;
 import com.hkbuyer.api.dto.AuditProofRequest;
 import com.hkbuyer.api.dto.ArbitrateAfterSaleCaseRequest;
 import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
+import com.hkbuyer.api.dto.CompleteSettlementPayoutRequest;
 import com.hkbuyer.api.dto.InboundScanRequest;
+import com.hkbuyer.api.dto.ReconcileSettlementLedgerRequest;
 import com.hkbuyer.api.dto.ReviewCustomsRequest;
 import com.hkbuyer.api.dto.SubmitCustomsRequest;
 import com.hkbuyer.api.dto.UpdateShipmentRequest;
@@ -12,6 +14,7 @@ import com.hkbuyer.service.BuyerService;
 import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.MetricsService;
 import com.hkbuyer.service.ProofService;
+import com.hkbuyer.service.SettlementService;
 import com.hkbuyer.service.TaskService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,19 +39,22 @@ public class AdminController {
     private final TaskService taskService;
     private final FulfillmentService fulfillmentService;
     private final AfterSaleService afterSaleService;
+    private final SettlementService settlementService;
 
     public AdminController(ProofService proofService,
                            MetricsService metricsService,
                            BuyerService buyerService,
                            TaskService taskService,
                            FulfillmentService fulfillmentService,
-                           AfterSaleService afterSaleService) {
+                           AfterSaleService afterSaleService,
+                           SettlementService settlementService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
         this.buyerService = buyerService;
         this.taskService = taskService;
         this.fulfillmentService = fulfillmentService;
         this.afterSaleService = afterSaleService;
+        this.settlementService = settlementService;
     }
 
     @GetMapping("/proofs/pending")
@@ -172,5 +178,37 @@ public class AdminController {
     @GetMapping("/metrics/after-sale-risk")
     public Map<String, Object> afterSaleRiskMetrics() {
         return metricsService.buildAfterSaleRiskMetrics();
+    }
+
+    @GetMapping("/settlements/pending-payout")
+    public List<Map<String, Object>> pendingPayoutSettlements() {
+        return settlementService.listPendingPayoutLedgers();
+    }
+
+    @PostMapping("/settlements/{ledgerId}/complete-payout")
+    public Map<String, Object> completeSettlementPayout(@PathVariable("ledgerId") Long ledgerId,
+                                                        @Valid @RequestBody CompleteSettlementPayoutRequest request) {
+        return settlementService.completePayout(ledgerId, request.getAdminId(), request.getComment());
+    }
+
+    @PostMapping("/settlements/{ledgerId}/reconcile")
+    public Map<String, Object> reconcileSettlement(@PathVariable("ledgerId") Long ledgerId,
+                                                   @Valid @RequestBody ReconcileSettlementLedgerRequest request) {
+        return settlementService.reconcileLedger(
+                ledgerId,
+                request.getAdminId(),
+                request.getDecision(),
+                request.getExceptionReason()
+        );
+    }
+
+    @GetMapping("/settlements/reconciliation/report")
+    public Map<String, Object> settlementReconciliationReport() {
+        return settlementService.buildReconciliationReport();
+    }
+
+    @GetMapping("/metrics/settlement")
+    public Map<String, Object> settlementMetrics() {
+        return metricsService.buildSettlementMetrics();
     }
 }
