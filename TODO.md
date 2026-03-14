@@ -183,3 +183,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 7（售后与风控闭环：缺货替代、部分退款、真伪争议、仲裁台）。
 - 下一 Sprint 验收标准：缺货替代与部分退款可执行、真伪争议有标准工单流转与仲裁结论、假货投诉率与订单取消率可观测。
 - 勘误/补充说明：此前 `TODO.md` 与 `Roadmap.md` 对 Sprint 6 记录存在滞后，本次已补齐 TODO 追加记录并保持历史 Sprint 不改写。
+
+## Sprint 7
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：7
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 7 PRD（2026-03-15）`
+- 分支：main
+- Commit：`efe3632`（feat(sprint7): deliver after-sale and risk arbitration loop）
+- Push 结果：已成功 push 到 `origin/main`（`4cc8bad..efe3632`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已新增售后与风控闭环能力，支持缺货替代/部分退款决策、真伪争议、后台仲裁与风险指标观测。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 6 仓配清关链路 V1，并补强“先交仓后扫描”约束与护栏同名指标。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 与本 Sprint 的后端自动化测试仍受本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 7 售后与风控闭环（缺货替代、部分退款、真伪争议、仲裁台）。
+- 本次实际完成：完成 Sprint 7 PRD；新增售后工单数据模型与 API；打通买手缺货上报 -> 用户决策 -> 后台仲裁闭环；新增真伪争议流程；数据平台新增售后风控指标。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V7__sprint7_after_sale_risk.sql`，落地 `after_sale_case` 表及 `idx_after_sale_order_status/idx_after_sale_type_status/idx_after_sale_risk_status`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`buyer-main.tsx` 新增缺货上报；`h5-main.tsx` 新增售后中心（真伪争议/工单查询/用户决策）；`admin-main.tsx` 新增仲裁台；`data-main.tsx` 新增售后风控指标展示；`status.ts` 新增 `AFTER_SALE_PROCESSING` 映射。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `AfterSaleService/AfterSaleRepository` 与 `AfterSaleCase`；新增接口 `/api/v1/buyer/tasks/{taskId}/stockout-report`、`/api/v1/orders/{orderId}/after-sale/*`、`/api/v1/admin/after-sale/*`、`/api/v1/admin/metrics/after-sale-risk`；扩展 `OrderStatus` 为 `AFTER_SALE_PROCESSING`。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：新增“买手缺货异常 -> 用户协商方案 -> 平台仲裁”补偿链路，减少异常单直接取消；未改动合规清关主路径。
+- 本次验证与测试结果：`cd frontend && npm run test` 通过（1 文件 / 4 用例）；`cd frontend && npm run typecheck` 通过；`cd frontend && npm run build` 通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）；`java -version` 失败（未安装 Java Runtime）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 7 对齐，售后与仲裁最小闭环已形成。
+- 架构师：保持前后端分离，新增能力继续遵循 Java8 + SpringMVC + MySQL。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 环境补跑。
+- 运营：可在后台集中处理待仲裁工单，并在数据平台追踪风控指标。
+- 用户：可在线发起真伪争议并参与缺货方案决策，售后透明度提升。
+- 当前风险与技术债：缺少 JDK8/Maven 导致后端测试未执行；退款结果仅做工单留痕，尚未接入真实财务落账与分账对账。
+- 下一 Sprint 建议目标：Roadmap Sprint 8（分账结算与财务对账闭环）。
+- 下一 Sprint 验收标准：订单签收后可自动分账并支持买手结算、平台费核算与对账报表；结算准确率口径可观测。
+- 勘误/补充说明：全程遵守合规边界，仅实现合规售后与清关路径，不实现任何绕关/走私能力。
