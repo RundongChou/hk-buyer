@@ -35,8 +35,8 @@
 - 对应 Roadmap Sprint：2
 - PRD：`Roadmap.md` -> `## Roadmap Sprint 2 PRD（2026-03-14）`
 - 分支：main
-- Commit：`待提交`
-- Push 结果：待 push
+- Commit：`1918c81`（feat(sprint2): deliver catalog and inventory hub with saleability checks）
+- Push 结果：已成功 push 到 `origin/main`（`fc5f11f..1918c81`）
 - CI 结果：未配置仓库 CI；本地前端测试已执行
 - 当前项目现状：已具备商品与库存中台 V1（SPU/SKU、上架审核、库存快照、缺货预警）并与下单链路打通。
 - 上一 Sprint 目标回顾：交付 Roadmap Sprint 1 最小闭环切片（下单支付->任务->接单->凭证->审核->时间线）。
