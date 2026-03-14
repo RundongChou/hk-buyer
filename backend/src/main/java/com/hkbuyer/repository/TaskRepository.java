@@ -36,8 +36,9 @@ public class TaskRepository {
                            String targetCategory,
                            Integer slaHours) {
         String sql = "INSERT INTO procurement_task(order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
-                "task_tier, required_buyer_level, target_region, target_category, sla_hours, accepted_at, updated_at) " +
-                "VALUES(?, NULL, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, NULL, NOW())";
+                "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +
+                "last_markup_at, next_markup_eligible_at, terminal_reason, accepted_at, updated_at) " +
+                "VALUES(?, NULL, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, NULL, NULL, NULL, NOW())";
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
@@ -57,7 +58,8 @@ public class TaskRepository {
 
     public Optional<ProcurementTask> findById(Long taskId) {
         String sql = "SELECT task_id, order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
-                "task_tier, required_buyer_level, target_region, target_category, sla_hours, accepted_at, updated_at " +
+                "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +
+                "last_markup_at, next_markup_eligible_at, terminal_reason, accepted_at, updated_at " +
                 "FROM procurement_task WHERE task_id = ?";
         List<ProcurementTask> tasks = jdbcTemplate.query(sql, taskRowMapper(), taskId);
         if (tasks.isEmpty()) {
@@ -68,9 +70,18 @@ public class TaskRepository {
 
     public List<ProcurementTask> listPublishedTasks() {
         String sql = "SELECT task_id, order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
-                "task_tier, required_buyer_level, target_region, target_category, sla_hours, accepted_at, updated_at " +
+                "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +
+                "last_markup_at, next_markup_eligible_at, terminal_reason, accepted_at, updated_at " +
                 "FROM procurement_task WHERE task_status = ? ORDER BY publish_at ASC";
         return jdbcTemplate.query(sql, taskRowMapper(), TaskStatus.PUBLISHED.name());
+    }
+
+    public List<ProcurementTask> listTimeoutCandidates(int limit) {
+        String sql = "SELECT task_id, order_id, buyer_id, task_status, publish_at, accept_deadline, suggested_markup, " +
+                "task_tier, required_buyer_level, target_region, target_category, sla_hours, markup_applied_count, redispatch_count, " +
+                "last_markup_at, next_markup_eligible_at, terminal_reason, accepted_at, updated_at " +
+                "FROM procurement_task WHERE task_status = ? AND accept_deadline < NOW() ORDER BY accept_deadline ASC LIMIT ?";
+        return jdbcTemplate.query(sql, taskRowMapper(), TaskStatus.PUBLISHED.name(), Integer.valueOf(limit));
     }
 
     public int acceptTask(Long taskId, Long buyerId) {
@@ -89,6 +100,27 @@ public class TaskRepository {
         jdbcTemplate.update(sql, taskStatus.name(), taskId);
     }
 
+    public int applyTimeoutMarkupAndRedispatch(Long taskId,
+                                               BigDecimal suggestedMarkup,
+                                               LocalDateTime nextMarkupEligibleAt,
+                                               LocalDateTime acceptDeadline) {
+        String sql = "UPDATE procurement_task SET suggested_markup = ?, markup_applied_count = markup_applied_count + 1, " +
+                "redispatch_count = redispatch_count + 1, last_markup_at = NOW(), next_markup_eligible_at = ?, accept_deadline = ?, " +
+                "terminal_reason = NULL, updated_at = NOW() WHERE task_id = ? AND task_status = ?";
+        return jdbcTemplate.update(sql,
+                suggestedMarkup,
+                Timestamp.valueOf(nextMarkupEligibleAt),
+                Timestamp.valueOf(acceptDeadline),
+                taskId,
+                TaskStatus.PUBLISHED.name());
+    }
+
+    public int markTimeoutTaskExpired(Long taskId, String terminalReason) {
+        String sql = "UPDATE procurement_task SET task_status = ?, terminal_reason = ?, updated_at = NOW() " +
+                "WHERE task_id = ? AND task_status = ?";
+        return jdbcTemplate.update(sql, TaskStatus.EXPIRED.name(), terminalReason, taskId, TaskStatus.PUBLISHED.name());
+    }
+
     public Long findOrderIdByTaskId(Long taskId) {
         String sql = "SELECT order_id FROM procurement_task WHERE task_id = ?";
         return jdbcTemplate.queryForObject(sql, Long.class, taskId);
@@ -103,6 +135,52 @@ public class TaskRepository {
     public long countTimeoutUnacceptedTasks() {
         String sql = "SELECT COUNT(1) FROM procurement_task WHERE task_status = ? AND accept_deadline < NOW()";
         Long result = jdbcTemplate.queryForObject(sql, Long.class, TaskStatus.PUBLISHED.name());
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countTimeoutCandidates() {
+        return countTimeoutUnacceptedTasks();
+    }
+
+    public long countFrequencyLimitedTimeoutCandidates() {
+        String sql = "SELECT COUNT(1) FROM procurement_task WHERE task_status = ? AND accept_deadline < NOW() " +
+                "AND next_markup_eligible_at IS NOT NULL AND next_markup_eligible_at > NOW()";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, TaskStatus.PUBLISHED.name());
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countTasksWithAutoMarkup() {
+        String sql = "SELECT COUNT(1) FROM procurement_task WHERE markup_applied_count > 0";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long sumAutoMarkupAppliedCount() {
+        String sql = "SELECT COALESCE(SUM(markup_applied_count), 0) FROM procurement_task";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long sumRedispatchCount() {
+        String sql = "SELECT COALESCE(SUM(redispatch_count), 0) FROM procurement_task";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countTimeoutTerminatedTasks() {
+        String sql = "SELECT COUNT(1) FROM procurement_task WHERE task_status = ? AND terminal_reason IS NOT NULL";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, TaskStatus.EXPIRED.name());
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countAcceptedAfterAutoMarkup() {
+        String sql = "SELECT COUNT(1) FROM procurement_task WHERE markup_applied_count > 0 AND task_status IN (?, ?, ?, ?)";
+        Long result = jdbcTemplate.queryForObject(sql,
+                Long.class,
+                TaskStatus.ACCEPTED.name(),
+                TaskStatus.PROOF_SUBMITTED.name(),
+                TaskStatus.PROOF_APPROVED.name(),
+                TaskStatus.PROOF_REJECTED.name());
         return result == null ? 0L : result.longValue();
     }
 
@@ -128,6 +206,13 @@ public class TaskRepository {
             task.setTargetRegion(rs.getString("target_region"));
             task.setTargetCategory(rs.getString("target_category"));
             task.setSlaHours(Integer.valueOf(rs.getInt("sla_hours")));
+            task.setMarkupAppliedCount(Integer.valueOf(rs.getInt("markup_applied_count")));
+            task.setRedispatchCount(Integer.valueOf(rs.getInt("redispatch_count")));
+            Timestamp lastMarkupAt = rs.getTimestamp("last_markup_at");
+            Timestamp nextMarkupEligibleAt = rs.getTimestamp("next_markup_eligible_at");
+            task.setLastMarkupAt(lastMarkupAt == null ? null : lastMarkupAt.toLocalDateTime());
+            task.setNextMarkupEligibleAt(nextMarkupEligibleAt == null ? null : nextMarkupEligibleAt.toLocalDateTime());
+            task.setTerminalReason(rs.getString("terminal_reason"));
             task.setAcceptedAt(acceptedAt == null ? null : acceptedAt.toLocalDateTime());
             task.setUpdatedAt(updatedAt == null ? null : updatedAt.toLocalDateTime());
             return task;

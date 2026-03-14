@@ -44,4 +44,30 @@ public class MetricsService {
         payload.put("buyer_gold_total", buyerService.countProfilesByLevel(BuyerLevel.GOLD));
         return payload;
     }
+
+    public Map<String, Object> buildDynamicPricingMetrics() {
+        long timeoutCandidates = taskService.countTimeoutCandidates();
+        long frequencyLimited = taskService.countFrequencyLimitedTimeoutCandidates();
+        long autoMarkupTaskTotal = taskService.countTasksWithAutoMarkup();
+        long autoMarkupAppliedTotal = taskService.sumAutoMarkupAppliedCount();
+        long redispatchTotal = taskService.sumRedispatchCount();
+        long terminatedTotal = taskService.countTimeoutTerminatedTasks();
+        long acceptedAfterMarkup = taskService.countAcceptedAfterAutoMarkup();
+
+        double acceptedRate = 0D;
+        if (autoMarkupTaskTotal > 0L) {
+            acceptedRate = (acceptedAfterMarkup * 1.0D) / autoMarkupTaskTotal;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("timeout_candidates_total", Long.valueOf(timeoutCandidates));
+        payload.put("timeout_candidates_frequency_limited", Long.valueOf(frequencyLimited));
+        payload.put("auto_markup_task_total", Long.valueOf(autoMarkupTaskTotal));
+        payload.put("auto_markup_applied_total", Long.valueOf(autoMarkupAppliedTotal));
+        payload.put("task_redispatch_total", Long.valueOf(redispatchTotal));
+        payload.put("task_timeout_terminated_total", Long.valueOf(terminatedTotal));
+        payload.put("repriced_task_accepted_total", Long.valueOf(acceptedAfterMarkup));
+        payload.put("repriced_task_accept_rate", Double.valueOf(acceptedRate));
+        return payload;
+    }
 }

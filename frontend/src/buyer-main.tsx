@@ -14,6 +14,11 @@ interface TaskItem {
   targetRegion: string;
   targetCategory: string;
   slaHours: number;
+  markupAppliedCount: number;
+  redispatchCount: number;
+  lastMarkupAt: string | null;
+  nextMarkupEligibleAt: string | null;
+  terminalReason: string | null;
 }
 
 interface BuyerProfile {

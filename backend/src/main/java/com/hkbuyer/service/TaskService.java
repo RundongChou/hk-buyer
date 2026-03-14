@@ -11,8 +11,12 @@ import com.hkbuyer.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,14 @@ import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
+
+    private static final BigDecimal AUTO_MARKUP_RATE = new BigDecimal("0.05");
+    private static final BigDecimal AUTO_MARKUP_MIN_INCREMENT = new BigDecimal("20.00");
+    private static final BigDecimal AUTO_MARKUP_CAP_RATE = new BigDecimal("0.20");
+    private static final int AUTO_MARKUP_MAX_COUNT = 3;
+    private static final int AUTO_MARKUP_COOLDOWN_HOURS = 24;
+    private static final int REDISPATCH_ACCEPT_WINDOW_HOURS = 72;
+    private static final int AUTO_REPRICE_BATCH_LIMIT = 200;
 
     private final TaskRepository taskRepository;
     private final ProofRepository proofRepository;
@@ -124,6 +136,161 @@ public class TaskService {
         return taskRepository.countTimeoutUnacceptedTasks();
     }
 
+    public List<Map<String, Object>> listTimeoutCandidates() {
+        List<ProcurementTask> tasks = taskRepository.listTimeoutCandidates(AUTO_REPRICE_BATCH_LIMIT);
+        LocalDateTime now = LocalDateTime.now();
+        return tasks.stream()
+                .map(task -> toTimeoutCandidatePayload(task, now))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Map<String, Object> runTimeoutReprice() {
+        List<ProcurementTask> candidates = taskRepository.listTimeoutCandidates(AUTO_REPRICE_BATCH_LIMIT);
+        LocalDateTime now = LocalDateTime.now();
+        int repricedCount = 0;
+        int skippedFrequencyCount = 0;
+        int terminatedCount = 0;
+        int concurrencySkippedCount = 0;
+        List<Map<String, Object>> details = new ArrayList<Map<String, Object>>();
+
+        for (ProcurementTask task : candidates) {
+            BigDecimal orderTotal = resolveOrderTotal(task.getOrderId());
+            BigDecimal currentMarkup = normalizeMoney(task.getSuggestedMarkup());
+            BigDecimal markupCap = calculateMarkupCap(orderTotal);
+
+            Map<String, Object> detail = new LinkedHashMap<String, Object>();
+            detail.put("taskId", task.getTaskId());
+            detail.put("orderId", task.getOrderId());
+            detail.put("orderTotalAmount", orderTotal);
+            detail.put("currentSuggestedMarkup", currentMarkup);
+            detail.put("markupCap", markupCap);
+            detail.put("markupAppliedCount", normalizeCount(task.getMarkupAppliedCount()));
+            detail.put("redispatchCount", normalizeCount(task.getRedispatchCount()));
+
+            if (shouldTerminate(task, currentMarkup, markupCap)) {
+                int affected = taskRepository.markTimeoutTaskExpired(task.getTaskId(), "MAX_REPRICE_LIMIT_REACHED");
+                if (affected == 0) {
+                    concurrencySkippedCount++;
+                    detail.put("action", "SKIPPED_CONCURRENT_UPDATE");
+                } else {
+                    terminatedCount++;
+                    orderService.updateOrderStatus(
+                            task.getOrderId(),
+                            OrderStatus.CANCELLED,
+                            "task_auto_terminated",
+                            "任务超时且达到提价上限，系统自动终止"
+                    );
+                    detail.put("action", "TERMINATED");
+                    detail.put("terminalReason", "MAX_REPRICE_LIMIT_REACHED");
+                }
+                details.add(detail);
+                continue;
+            }
+
+            if (isFrequencyLimited(task, now)) {
+                skippedFrequencyCount++;
+                detail.put("action", "SKIPPED_FREQUENCY_LIMIT");
+                detail.put("nextMarkupEligibleAt", task.getNextMarkupEligibleAt());
+                details.add(detail);
+                continue;
+            }
+
+            BigDecimal markupIncrement = calculateMarkupIncrement(orderTotal);
+            BigDecimal newSuggestedMarkup = currentMarkup.add(markupIncrement);
+            if (newSuggestedMarkup.compareTo(markupCap) > 0) {
+                newSuggestedMarkup = markupCap;
+            }
+            newSuggestedMarkup = normalizeMoney(newSuggestedMarkup);
+
+            if (newSuggestedMarkup.compareTo(currentMarkup) <= 0) {
+                int affected = taskRepository.markTimeoutTaskExpired(task.getTaskId(), "MARKUP_CAP_REACHED");
+                if (affected == 0) {
+                    concurrencySkippedCount++;
+                    detail.put("action", "SKIPPED_CONCURRENT_UPDATE");
+                } else {
+                    terminatedCount++;
+                    orderService.updateOrderStatus(
+                            task.getOrderId(),
+                            OrderStatus.CANCELLED,
+                            "task_auto_terminated",
+                            "任务超时且达到提价封顶，系统自动终止"
+                    );
+                    detail.put("action", "TERMINATED");
+                    detail.put("terminalReason", "MARKUP_CAP_REACHED");
+                }
+                details.add(detail);
+                continue;
+            }
+
+            LocalDateTime nextMarkupEligibleAt = now.plusHours(AUTO_MARKUP_COOLDOWN_HOURS);
+            LocalDateTime newAcceptDeadline = now.plusHours(REDISPATCH_ACCEPT_WINDOW_HOURS);
+            int affected = taskRepository.applyTimeoutMarkupAndRedispatch(
+                    task.getTaskId(),
+                    newSuggestedMarkup,
+                    nextMarkupEligibleAt,
+                    newAcceptDeadline
+            );
+            if (affected == 0) {
+                concurrencySkippedCount++;
+                detail.put("action", "SKIPPED_CONCURRENT_UPDATE");
+                details.add(detail);
+                continue;
+            }
+
+            repricedCount++;
+            orderService.updateOrderStatus(
+                    task.getOrderId(),
+                    OrderStatus.PAID_WAIT_ACCEPT,
+                    "task_auto_repriced",
+                    "72h无人接单，系统自动提价重派，建议加价调整为: " + newSuggestedMarkup.toPlainString()
+            );
+            detail.put("action", "REPRICED_AND_REDISPATCHED");
+            detail.put("newSuggestedMarkup", newSuggestedMarkup);
+            detail.put("nextMarkupEligibleAt", nextMarkupEligibleAt);
+            detail.put("newAcceptDeadline", newAcceptDeadline);
+            details.add(detail);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("runAt", now);
+        payload.put("batchSize", Integer.valueOf(candidates.size()));
+        payload.put("repricedCount", Integer.valueOf(repricedCount));
+        payload.put("skippedFrequencyCount", Integer.valueOf(skippedFrequencyCount));
+        payload.put("terminatedCount", Integer.valueOf(terminatedCount));
+        payload.put("concurrencySkippedCount", Integer.valueOf(concurrencySkippedCount));
+        payload.put("details", details);
+        return payload;
+    }
+
+    public long countTimeoutCandidates() {
+        return taskRepository.countTimeoutCandidates();
+    }
+
+    public long countFrequencyLimitedTimeoutCandidates() {
+        return taskRepository.countFrequencyLimitedTimeoutCandidates();
+    }
+
+    public long countTasksWithAutoMarkup() {
+        return taskRepository.countTasksWithAutoMarkup();
+    }
+
+    public long sumAutoMarkupAppliedCount() {
+        return taskRepository.sumAutoMarkupAppliedCount();
+    }
+
+    public long sumRedispatchCount() {
+        return taskRepository.sumRedispatchCount();
+    }
+
+    public long countTimeoutTerminatedTasks() {
+        return taskRepository.countTimeoutTerminatedTasks();
+    }
+
+    public long countAcceptedAfterAutoMarkup() {
+        return taskRepository.countAcceptedAfterAutoMarkup();
+    }
+
     private Map<String, Object> toTaskPayload(ProcurementTask task) {
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("taskId", task.getTaskId());
@@ -136,7 +303,73 @@ public class TaskService {
         payload.put("targetRegion", task.getTargetRegion());
         payload.put("targetCategory", task.getTargetCategory());
         payload.put("slaHours", task.getSlaHours());
+        payload.put("markupAppliedCount", task.getMarkupAppliedCount());
+        payload.put("redispatchCount", task.getRedispatchCount());
+        payload.put("lastMarkupAt", task.getLastMarkupAt());
+        payload.put("nextMarkupEligibleAt", task.getNextMarkupEligibleAt());
+        payload.put("terminalReason", task.getTerminalReason());
         return payload;
+    }
+
+    private Map<String, Object> toTimeoutCandidatePayload(ProcurementTask task, LocalDateTime now) {
+        BigDecimal orderTotal = resolveOrderTotal(task.getOrderId());
+        BigDecimal currentMarkup = normalizeMoney(task.getSuggestedMarkup());
+        BigDecimal markupCap = calculateMarkupCap(orderTotal);
+        boolean frequencyLimited = isFrequencyLimited(task, now);
+        boolean alreadyAtCapOrLimit = shouldTerminate(task, currentMarkup, markupCap);
+        Map<String, Object> payload = toTaskPayload(task);
+        payload.put("orderTotalAmount", orderTotal);
+        payload.put("markupCap", markupCap);
+        payload.put("canAutoReprice", Boolean.valueOf(!frequencyLimited && !alreadyAtCapOrLimit));
+        payload.put("frequencyLimited", Boolean.valueOf(frequencyLimited));
+        payload.put("alreadyAtCapOrLimit", Boolean.valueOf(alreadyAtCapOrLimit));
+        return payload;
+    }
+
+    private BigDecimal resolveOrderTotal(Long orderId) {
+        if (orderId == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal totalAmount = orderService.getOrderOrThrow(orderId).getTotalAmount();
+        return normalizeMoney(totalAmount);
+    }
+
+    private boolean isFrequencyLimited(ProcurementTask task, LocalDateTime now) {
+        LocalDateTime nextMarkupEligibleAt = task.getNextMarkupEligibleAt();
+        return nextMarkupEligibleAt != null && nextMarkupEligibleAt.isAfter(now);
+    }
+
+    private boolean shouldTerminate(ProcurementTask task, BigDecimal currentMarkup, BigDecimal markupCap) {
+        if (normalizeCount(task.getMarkupAppliedCount()) >= AUTO_MARKUP_MAX_COUNT) {
+            return true;
+        }
+        if (markupCap.signum() <= 0) {
+            return true;
+        }
+        return currentMarkup.compareTo(markupCap) >= 0;
+    }
+
+    private BigDecimal calculateMarkupIncrement(BigDecimal orderTotal) {
+        BigDecimal byRate = orderTotal.multiply(AUTO_MARKUP_RATE);
+        if (byRate.compareTo(AUTO_MARKUP_MIN_INCREMENT) < 0) {
+            return AUTO_MARKUP_MIN_INCREMENT;
+        }
+        return normalizeMoney(byRate);
+    }
+
+    private BigDecimal calculateMarkupCap(BigDecimal orderTotal) {
+        return normalizeMoney(orderTotal.multiply(AUTO_MARKUP_CAP_RATE));
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal amount) {
+        if (amount == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int normalizeCount(Integer value) {
+        return value == null ? 0 : value.intValue();
     }
 
     private boolean isTaskEligible(ProcurementTask task, BuyerProfile profile) {

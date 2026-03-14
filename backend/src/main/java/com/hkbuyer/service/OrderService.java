@@ -224,7 +224,7 @@ public class OrderService {
         long taskId = taskRepository.createTask(
                 orderId,
                 new BigDecimal("20.00"),
-                LocalDateTime.now().plusHours(dispatchPlan.getSlaHours().longValue()),
+                LocalDateTime.now().plusHours(72),
                 dispatchPlan.getTaskTier(),
                 dispatchPlan.getRequiredBuyerLevel(),
                 dispatchPlan.getTargetRegion(),

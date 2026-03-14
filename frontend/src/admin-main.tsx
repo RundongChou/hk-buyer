@@ -38,6 +38,31 @@ interface BuyerOnboardingItem {
   createdAt: string;
 }
 
+interface TimeoutCandidateItem {
+  taskId: number;
+  orderId: number;
+  taskStatus: string;
+  acceptDeadline: string;
+  suggestedMarkup: string;
+  markupAppliedCount: number;
+  redispatchCount: number;
+  nextMarkupEligibleAt: string | null;
+  terminalReason: string | null;
+  canAutoReprice: boolean;
+  frequencyLimited: boolean;
+  alreadyAtCapOrLimit: boolean;
+}
+
+interface TimeoutRepriceResult {
+  runAt: string;
+  batchSize: number;
+  repricedCount: number;
+  skippedFrequencyCount: number;
+  terminatedCount: number;
+  concurrencySkippedCount: number;
+  details: Array<Record<string, unknown>>;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -71,6 +96,8 @@ function AdminApp(): JSX.Element {
   const [stockAlert, setStockAlert] = useState('5');
   const [stockReason, setStockReason] = useState('manual_adjust');
   const [outOfStockAlerts, setOutOfStockAlerts] = useState<CatalogSku[]>([]);
+  const [timeoutCandidates, setTimeoutCandidates] = useState<TimeoutCandidateItem[]>([]);
+  const [timeoutRepriceResult, setTimeoutRepriceResult] = useState<TimeoutRepriceResult | null>(null);
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -123,6 +150,15 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadTimeoutCandidates = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<TimeoutCandidateItem[]>('/api/v1/admin/tasks/timeout-candidates');
+      setTimeoutCandidates(payload);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
@@ -130,6 +166,7 @@ function AdminApp(): JSX.Element {
       await loadPendingSkus();
       await loadOutOfStockAlerts();
       await loadPendingBuyerApplications();
+      await loadTimeoutCandidates();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -284,6 +321,22 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const runTimeoutReprice = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const payload = await apiRequest<TimeoutRepriceResult>('/api/v1/admin/tasks/timeout-reprice/run', {
+        method: 'POST'
+      });
+      setTimeoutRepriceResult(payload);
+      await loadTimeoutCandidates();
+      setMessage(`自动提价执行完成：提价 ${payload.repricedCount}，终止 ${payload.terminatedCount}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -338,6 +391,18 @@ function AdminApp(): JSX.Element {
           </label>
         </div>
         <button onClick={auditBuyerApplication} disabled={busy}>提交买手审核</button>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 5 动态提价与重派</h2>
+        <div className="grid grid-2">
+          <button onClick={loadTimeoutCandidates} disabled={busy}>刷新超时候选任务</button>
+          <button onClick={runTimeoutReprice} disabled={busy}>执行自动提价重派</button>
+        </div>
+        <h3>候选任务</h3>
+        <pre>{JSON.stringify(timeoutCandidates, null, 2)}</pre>
+        <h3>最近执行结果</h3>
+        <pre>{JSON.stringify(timeoutRepriceResult, null, 2)}</pre>
       </div>
 
       <div className="card grid grid-2">

@@ -26,25 +26,39 @@ interface BuyerFulfillmentMetrics {
   buyer_gold_total: number;
 }
 
+interface DynamicPricingMetrics {
+  timeout_candidates_total: number;
+  timeout_candidates_frequency_limited: number;
+  auto_markup_task_total: number;
+  auto_markup_applied_total: number;
+  task_redispatch_total: number;
+  task_timeout_terminated_total: number;
+  repriced_task_accepted_total: number;
+  repriced_task_accept_rate: number;
+}
+
 function DataApp(): JSX.Element {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [catalogMetrics, setCatalogMetrics] = useState<CatalogMetrics | null>(null);
   const [buyerMetrics, setBuyerMetrics] = useState<BuyerFulfillmentMetrics | null>(null);
+  const [dynamicMetrics, setDynamicMetrics] = useState<DynamicPricingMetrics | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadMetrics = async (): Promise<void> => {
     setBusy(true);
     try {
-      const [funnelPayload, catalogPayload, buyerPayload] = await Promise.all([
+      const [funnelPayload, catalogPayload, buyerPayload, dynamicPayload] = await Promise.all([
         apiRequest<FunnelMetrics>('/api/v1/admin/metrics/funnel'),
         apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog'),
-        apiRequest<BuyerFulfillmentMetrics>('/api/v1/admin/metrics/buyer-fulfillment')
+        apiRequest<BuyerFulfillmentMetrics>('/api/v1/admin/metrics/buyer-fulfillment'),
+        apiRequest<DynamicPricingMetrics>('/api/v1/admin/metrics/dynamic-pricing')
       ]);
       setFunnelMetrics(funnelPayload);
       setCatalogMetrics(catalogPayload);
       setBuyerMetrics(buyerPayload);
-      setMessage('漏斗、商品库存、买手履约指标已刷新');
+      setDynamicMetrics(dynamicPayload);
+      setMessage('漏斗、商品库存、买手履约、动态提价指标已刷新');
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -119,6 +133,26 @@ function DataApp(): JSX.Element {
           <div className="badge">buyer_gold_total</div>
           <h2>{buyerMetrics?.buyer_gold_total ?? '-'}</h2>
         </div>
+        <div>
+          <div className="badge">timeout_candidates_total</div>
+          <h2>{dynamicMetrics?.timeout_candidates_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">auto_markup_applied_total</div>
+          <h2>{dynamicMetrics?.auto_markup_applied_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">task_redispatch_total</div>
+          <h2>{dynamicMetrics?.task_redispatch_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">task_timeout_terminated_total</div>
+          <h2>{dynamicMetrics?.task_timeout_terminated_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">repriced_task_accept_rate</div>
+          <h2>{dynamicMetrics?.repriced_task_accept_rate ?? '-'}</h2>
+        </div>
       </div>
       <div className="card">
         <strong>消息：</strong> {message}
@@ -134,6 +168,10 @@ function DataApp(): JSX.Element {
       <div className="card">
         <h2>买手履约指标</h2>
         <pre>{JSON.stringify(buyerMetrics, null, 2)}</pre>
+      </div>
+      <div className="card">
+        <h2>动态提价与重派指标</h2>
+        <pre>{JSON.stringify(dynamicMetrics, null, 2)}</pre>
       </div>
     </div>
   );

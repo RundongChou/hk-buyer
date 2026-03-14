@@ -16,6 +16,11 @@ public class ProcurementTask {
     private String targetRegion;
     private String targetCategory;
     private Integer slaHours;
+    private Integer markupAppliedCount;
+    private Integer redispatchCount;
+    private LocalDateTime lastMarkupAt;
+    private LocalDateTime nextMarkupEligibleAt;
+    private String terminalReason;
     private LocalDateTime acceptedAt;
     private LocalDateTime updatedAt;
 
@@ -113,6 +118,46 @@ public class ProcurementTask {
 
     public void setSlaHours(Integer slaHours) {
         this.slaHours = slaHours;
+    }
+
+    public Integer getMarkupAppliedCount() {
+        return markupAppliedCount;
+    }
+
+    public void setMarkupAppliedCount(Integer markupAppliedCount) {
+        this.markupAppliedCount = markupAppliedCount;
+    }
+
+    public Integer getRedispatchCount() {
+        return redispatchCount;
+    }
+
+    public void setRedispatchCount(Integer redispatchCount) {
+        this.redispatchCount = redispatchCount;
+    }
+
+    public LocalDateTime getLastMarkupAt() {
+        return lastMarkupAt;
+    }
+
+    public void setLastMarkupAt(LocalDateTime lastMarkupAt) {
+        this.lastMarkupAt = lastMarkupAt;
+    }
+
+    public LocalDateTime getNextMarkupEligibleAt() {
+        return nextMarkupEligibleAt;
+    }
+
+    public void setNextMarkupEligibleAt(LocalDateTime nextMarkupEligibleAt) {
+        this.nextMarkupEligibleAt = nextMarkupEligibleAt;
+    }
+
+    public String getTerminalReason() {
+        return terminalReason;
+    }
+
+    public void setTerminalReason(String terminalReason) {
+        this.terminalReason = terminalReason;
     }
 
     public LocalDateTime getAcceptedAt() {
