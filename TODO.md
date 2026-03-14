@@ -59,3 +59,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 3（购物车、优惠券、税费估算、支付失败补偿）。
 - 下一 Sprint 验收标准：支付异常可补偿、订单状态一致性可验证、交易成功率提升可量化。
 - 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
+
+## Sprint 3
+- 日期：2026-03-14
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：3
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 3 PRD（2026-03-14）`
+- 分支：main
+- Commit：`2b0f3c4`（feat(sprint3): deliver trade stability with cart quote and payment compensation）
+- Push 结果：已成功 push 到 `origin/main`（`c98e93a..2b0f3c4`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已具备交易稳态 V2 最小闭环（购物车、优惠券、税费估算、支付失败补偿、补偿支付成功后任务发布）。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 2 商品与库存中台 V1（建品、审核上架、可搜可买、缺货不可误售）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：后端自动化测试因本地缺少 Java/Maven 未执行。
+- 本次 Sprint 目标：交付 Roadmap Sprint 3 交易与支付稳态 V2（购物车、优惠券、税费估算、支付失败补偿）。
+- 本次实际完成：完成 Sprint 3 PRD；新增购物车与结算接口；新增优惠券与税费估算；新增支付失败记录与补偿支付接口；H5 与数据平台完成联动展示。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V3__sprint3_trade_payment_stability.sql`，包含 `user_cart_item/coupon_template/payment_compensation` 与 `uk_user_cart/idx_coupon_status_valid/idx_payment_comp_order_status`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`h5-main.tsx` 新增强化交易流程（加购、结算报价、支付失败补偿）；`data-main.tsx` 新增 `payment_failed/payment_compensated` 指标卡。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `CartController`、`CheckoutController`、`CartService`、`CartRepository`、`CouponRepository`、`PaymentCompensationRepository`；`OrderService` 扩展购物车结算与支付补偿能力。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：新增支付补偿后再发布采购任务逻辑，减少支付失败产生的无效任务；未改动清关与物流链路。
+- 本次验证与测试结果：`frontend` 的 `npm run test/typecheck/build` 全通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 3 对齐，交易稳定性闭环已形成。
+- 架构师：保持前后端分离，Java8 + SpringMVC + JDBC + MySQL 分层清晰。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 或 CI 容器补跑。
+- 运营：可观察支付失败与补偿成功指标，便于跟踪支付阶段损耗。
+- 用户：可先看结算明细再支付，失败后可补偿重试，减少重复下单成本。
+- 当前风险与技术债：后端测试未在本机执行；税费估算仍为统一税率模型，尚未细化税则。
+- 下一 Sprint 建议目标：Roadmap Sprint 4（买手入驻审核、任务分层、接单 SLA、信誉分）。
+- 下一 Sprint 验收标准：买手准入->抢单->履约->评分沉淀完整可演示，72h 接单 SLA 可统计。
+- 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
