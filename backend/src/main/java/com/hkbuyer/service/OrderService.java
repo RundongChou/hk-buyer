@@ -205,6 +205,14 @@ public class OrderService {
         return orderRepository.countPaidOrders();
     }
 
+    public long countCancelledOrders() {
+        return orderRepository.countCancelledOrders();
+    }
+
+    public long countTotalOrders() {
+        return orderRepository.countTotalOrders();
+    }
+
     public long countPaymentFailedEvents() {
         return paymentCompensationRepository.countFailedPaymentEvents();
     }

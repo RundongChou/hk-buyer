@@ -3,6 +3,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   PAID_WAIT_ACCEPT: '待接单',
   BUYER_PROCUREMENT: '采购中',
   PROOF_UNDER_REVIEW: '凭证审核中',
+  AFTER_SALE_PROCESSING: '售后处理中',
   WAIT_INBOUND: '待入仓',
   CUSTOMS_CLEARANCE: '清关中',
   IN_TRANSIT: '运输中',

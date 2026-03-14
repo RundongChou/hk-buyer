@@ -10,6 +10,10 @@ describe('toOrderStatusLabel', () => {
     expect(toOrderStatusLabel('CUSTOMS_CLEARANCE')).toBe('清关中');
   });
 
+  it('maps after sale status to zh-cn label', () => {
+    expect(toOrderStatusLabel('AFTER_SALE_PROCESSING')).toBe('售后处理中');
+  });
+
   it('returns fallback for unknown status', () => {
     expect(toOrderStatusLabel('UNKNOWN')).toBe('UNKNOWN');
   });

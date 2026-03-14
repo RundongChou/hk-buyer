@@ -1,8 +1,10 @@
 package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AcceptTaskRequest;
+import com.hkbuyer.api.dto.ReportStockoutRequest;
 import com.hkbuyer.api.dto.SubmitTaskHandoverRequest;
 import com.hkbuyer.api.dto.SubmitProofRequest;
+import com.hkbuyer.service.AfterSaleService;
 import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.TaskService;
 import org.springframework.validation.annotation.Validated;
@@ -25,11 +27,14 @@ public class BuyerTaskController {
 
     private final TaskService taskService;
     private final FulfillmentService fulfillmentService;
+    private final AfterSaleService afterSaleService;
 
     public BuyerTaskController(TaskService taskService,
-                               FulfillmentService fulfillmentService) {
+                               FulfillmentService fulfillmentService,
+                               AfterSaleService afterSaleService) {
         this.taskService = taskService;
         this.fulfillmentService = fulfillmentService;
+        this.afterSaleService = afterSaleService;
     }
 
     @GetMapping
@@ -53,5 +58,17 @@ public class BuyerTaskController {
     public Map<String, Object> submitHandover(@PathVariable("taskId") Long taskId,
                                               @Valid @RequestBody SubmitTaskHandoverRequest request) {
         return fulfillmentService.submitHandover(taskId, request.getBuyerId(), request.getWarehouseCode());
+    }
+
+    @PostMapping("/{taskId}/stockout-report")
+    public Map<String, Object> reportStockout(@PathVariable("taskId") Long taskId,
+                                              @Valid @RequestBody ReportStockoutRequest request) {
+        return afterSaleService.reportStockout(
+                taskId,
+                request.getBuyerId(),
+                request.getIssueReason(),
+                request.getReplacementSkuName(),
+                request.getSuggestedRefundAmount()
+        );
     }
 }

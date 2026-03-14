@@ -1374,3 +1374,133 @@ NSM（CCO-30）贡献：
 2. 后端：本 Sprint 改动均为 Java 8 + Spring MVC。
 3. 数据库：继续使用 MySQL；本 Sprint 无结构迁移。
 4. 现状与目标栈一致，无需迁移；仅做增量兼容演进。
+
+## Roadmap Sprint 7 PRD（2026-03-15）
+
+### 1. 背景与问题定义
+Roadmap Sprint 7 的目标是“售后与风控闭环（缺货替代、部分退款、真伪争议、仲裁台）”。
+当前仓库已打通交易、买手履约、仓配清关，但异常订单仍缺少标准化闭环：
+1. 买手缺货只能线下沟通，平台无结构化“替代/部分退款”协商链路。
+2. 用户真伪争议缺少线上工单与仲裁动作，难以沉淀可审计风控证据。
+3. 数据平台未集中输出售后与风控护栏指标，运营无法快速评估投诉与取消风险。
+
+### 2. Sprint 目标（可验证）
+1. 打通“买手缺货上报 -> 用户选择替代/部分退款 -> 后台仲裁结案”的最小闭环。
+2. 打通“用户发起真伪争议 -> 后台仲裁 -> 结案”的标准工单闭环。
+3. 数据平台新增售后风控指标，至少覆盖假货投诉率与订单取消率两个护栏口径。
+4. 全部改动保持 `TypeScript + TSX / Java 8 + Spring MVC / MySQL`。
+
+### 3. 非目标（明确不做）
+1. 不接入第三方支付退款回调与财务结算系统（Roadmap Sprint 8）。
+2. 不实现自动化风控模型与反欺诈规则引擎（先做规则化工单流转）。
+3. 不扩展海外多关务通道，不实现任何绕关/走私相关能力。
+4. 不新增营销与会员策略（Roadmap Sprint 9）。
+
+### 4. 用户故事与使用场景
+1. 买手端：作为买手，当采购缺货时可提交缺货原因、替代建议与建议部分退款金额。
+2. 用户端：作为用户，我能看到售后工单，并对缺货方案做“接受替代”或“申请部分退款”决策。
+3. 用户端：作为用户，我能发起真伪争议并提交说明，进入平台仲裁流程。
+4. 管理后台：作为运营/风控，我能查看待处理工单并输出仲裁结果（通过替代、通过部分退款、驳回）。
+5. 数据平台：作为运营，我能查看售后与风控指标，监控假货投诉率与取消率变化。
+
+### 5. 范围（In Scope / Out of Scope）
+In Scope：
+1. `after_sale_case` MySQL 工单表及索引。
+2. 买手缺货上报接口、用户真伪争议接口、用户缺货决策接口、后台仲裁接口。
+3. 管理后台待仲裁工单列表与仲裁动作。
+4. H5 售后发起与决策交互。
+5. 数据平台售后风控指标接口与展示。
+
+Out of Scope：
+1. 实际资金退款落账与结算对账。
+2. 外部风控服务与 OCR 鉴伪模型。
+3. 客服多级 SLA 与通知系统。
+
+### 6. 功能需求清单（FR）
+1. FR-S7-01：买手可对已接单任务提交缺货工单，包含缺货原因、替代商品建议、建议退款金额。
+2. FR-S7-02：用户可发起真伪争议工单，包含争议说明与证据链接。
+3. FR-S7-03：用户可对“缺货工单”提交决策（接受替代/申请部分退款），工单进入后台仲裁。
+4. FR-S7-04：后台可查询待仲裁工单，并执行仲裁（通过替代/通过部分退款/驳回诉求）。
+5. FR-S7-05：仲裁结案后，工单状态可追溯，订单时间线有留痕。
+6. FR-S7-06：数据平台可展示售后与风控指标（待处理工单数、已结案工单数、假货投诉率、订单取消率、部分退款通过数）。
+
+### 7. 数据与接口变更（MySQL）
+1. 新增迁移：`db/mysql/V7__sprint7_after_sale_risk.sql`。
+2. 新增表：`after_sale_case`，核心字段包含：
+   - 关联字段：`order_id`、`task_id`、`user_id`、`buyer_id`
+   - 工单属性：`case_type`、`case_status`、`issue_reason`、`evidence_url`
+   - 协商与仲裁：`replacement_sku_name`、`suggested_refund_amount`、`negotiated_refund_amount`、`user_decision`、`arbitration_result`
+   - 风控与审计：`risk_level`、`origin_order_status`、`admin_id`、`arbitration_comment`、`created_at/updated_at/closed_at`
+3. 新增索引：
+   - `idx_after_sale_order_status`
+   - `idx_after_sale_type_status`
+   - `idx_after_sale_risk_status`
+4. 新增/变更 API（Spring MVC）：
+   - `POST /api/v1/buyer/tasks/{taskId}/stockout-report`
+   - `POST /api/v1/orders/{orderId}/after-sale/authenticity`
+   - `POST /api/v1/orders/{orderId}/after-sale/cases/{caseId}/decision`
+   - `GET /api/v1/orders/{orderId}/after-sale/cases`
+   - `GET /api/v1/admin/after-sale/cases/pending`
+   - `POST /api/v1/admin/after-sale/cases/{caseId}/arbitrate`
+   - `GET /api/v1/admin/metrics/after-sale-risk`
+
+### 8. 前端交互与页面变更（TypeScript + JSX）
+1. 买手端（TSX）：新增“缺货上报”表单，提交缺货原因、替代建议与建议退款金额。
+2. H5 用户端（TSX）：新增“售后中心”区块，支持：
+   - 发起真伪争议
+   - 查询订单售后工单
+   - 对缺货工单提交用户决策
+3. 管理后台（TSX）：新增“售后与风控仲裁台”，可刷新待仲裁工单并提交仲裁结果。
+4. 数据平台（TSX）：新增售后风控指标卡与 JSON 明细展示。
+5. 不新增纯 JavaScript 页面，全部改动使用 TypeScript + TSX。
+
+### 9. 后端实现变更（Java8 + SpringMVC）
+1. 新增 `AfterSaleService` 与 `AfterSaleRepository`，负责工单创建、用户决策、仲裁结案、指标聚合。
+2. 扩展 `BuyerTaskController`、`OrderController`、`AdminController` 提供 Sprint 7 接口。
+3. 扩展 `OrderStatus` 支持售后处理状态，保证时间线可追溯。
+4. 扩展 `MetricsService` 输出售后风控指标，映射护栏口径。
+5. 保持 `Java 8 + Spring MVC + MySQL`，无偏栈改造。
+
+### 10. 测试计划与验收标准（DoD）
+测试计划：
+1. 前端：`cd frontend && npm run test && npm run typecheck && npm run build`。
+2. 后端：`mvn -f backend/pom.xml test`（若环境缺少 Java/Maven，记录阻塞与补跑建议）。
+3. 业务冒烟：
+   - 买手缺货上报 -> 用户提交决策 -> 后台仲裁结案。
+   - 用户真伪争议 -> 后台仲裁结案。
+   - H5/后台/数据平台均可查询到售后工单与指标变化。
+
+DoD：
+1. 至少一条“缺货替代或部分退款”链路可在系统内闭环演示。
+2. 至少一条“真伪争议仲裁”链路可在系统内闭环演示。
+3. 售后风控指标 API 与数据平台页面可读取并展示。
+4. 文档（Roadmap/README/TODO）和 Git（commit + push）记录完整。
+
+### 11. 风险与回滚方案
+1. 风险：售后状态与订单状态切换耦合导致状态回滚复杂。
+   回滚：保留工单主状态流转，订单状态恢复采用保守策略并记录时间线。
+2. 风险：部分退款金额缺少财务系统落账，可能与后续分账不一致。
+   回滚：仅做“仲裁结果留痕”，资金落账延后到 Sprint 8 财务结算。
+3. 风险：高频争议可能造成后台人工仲裁积压。
+   回滚：先聚焦待仲裁列表与优先级字段，后续再扩展 SLA/通知。
+4. 风险：本机缺少 JDK8/Maven，后端自动化测试无法执行。
+   回滚/缓解：在具备 Java8 + Maven 的 CI 或开发机补跑后端测试。
+
+### 12. 与北极星指标映射（本 Sprint 如何贡献 CCO-30 与护栏）
+NSM（CCO-30）贡献：
+1. 通过异常订单标准化处理（替代/部分退款/仲裁），降低中途流失，提升支付后订单进入履约闭环的概率。
+
+护栏映射：
+1. 假货投诉率：真伪争议工单标准化并可仲裁，提升可追踪性与处置时效。
+2. 72h 超时未接单率：本 Sprint 不调整派单逻辑，延续 Sprint 5 机制。
+3. 订单取消率：缺货替代与部分退款机制降低“全单取消”概率。
+4. 7-15天履约达成率：异常在早期售后环节分流，减少后段履约中断。
+5. 合规清关成功率：不变更清关路径，仅在合规前置异常处理侧补强。
+6. 用户NPS：争议可在线处理并留痕，提升信任与满意度。
+
+### 13. 技术栈符合性与迁移策略
+1. 前端：Sprint 7 页面改动全部使用 TypeScript + TSX。
+2. 后端：Sprint 7 接口与服务全部使用 Java 8 + Spring MVC。
+3. 数据库：结构变更通过 MySQL 增量迁移脚本落地。
+4. 现状已与目标栈一致，本 Sprint 仅增量扩展，无需技术栈迁移。
+5. 合规边界：仅实现合规售后与争议处理，不实现任何绕关/走私相关设计。

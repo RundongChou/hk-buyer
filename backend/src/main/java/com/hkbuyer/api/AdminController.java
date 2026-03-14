@@ -1,11 +1,13 @@
 package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AuditProofRequest;
+import com.hkbuyer.api.dto.ArbitrateAfterSaleCaseRequest;
 import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
 import com.hkbuyer.api.dto.InboundScanRequest;
 import com.hkbuyer.api.dto.ReviewCustomsRequest;
 import com.hkbuyer.api.dto.SubmitCustomsRequest;
 import com.hkbuyer.api.dto.UpdateShipmentRequest;
+import com.hkbuyer.service.AfterSaleService;
 import com.hkbuyer.service.BuyerService;
 import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.MetricsService;
@@ -33,17 +35,20 @@ public class AdminController {
     private final BuyerService buyerService;
     private final TaskService taskService;
     private final FulfillmentService fulfillmentService;
+    private final AfterSaleService afterSaleService;
 
     public AdminController(ProofService proofService,
                            MetricsService metricsService,
                            BuyerService buyerService,
                            TaskService taskService,
-                           FulfillmentService fulfillmentService) {
+                           FulfillmentService fulfillmentService,
+                           AfterSaleService afterSaleService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
         this.buyerService = buyerService;
         this.taskService = taskService;
         this.fulfillmentService = fulfillmentService;
+        this.afterSaleService = afterSaleService;
     }
 
     @GetMapping("/proofs/pending")
@@ -145,5 +150,27 @@ public class AdminController {
     @GetMapping("/metrics/fulfillment")
     public Map<String, Object> fulfillmentMetrics() {
         return metricsService.buildFulfillmentMetrics();
+    }
+
+    @GetMapping("/after-sale/cases/pending")
+    public List<Map<String, Object>> pendingAfterSaleCases() {
+        return afterSaleService.listPendingArbitrationCases();
+    }
+
+    @PostMapping("/after-sale/cases/{caseId}/arbitrate")
+    public Map<String, Object> arbitrateAfterSaleCase(@PathVariable("caseId") Long caseId,
+                                                      @Valid @RequestBody ArbitrateAfterSaleCaseRequest request) {
+        return afterSaleService.arbitrateCase(
+                caseId,
+                request.getAdminId(),
+                request.getDecision(),
+                request.getComment(),
+                request.getFinalRefundAmount()
+        );
+    }
+
+    @GetMapping("/metrics/after-sale-risk")
+    public Map<String, Object> afterSaleRiskMetrics() {
+        return metricsService.buildAfterSaleRiskMetrics();
     }
 }

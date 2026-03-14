@@ -14,17 +14,20 @@ public class MetricsService {
     private final ProofService proofService;
     private final BuyerService buyerService;
     private final FulfillmentService fulfillmentService;
+    private final AfterSaleService afterSaleService;
 
     public MetricsService(OrderService orderService,
                           TaskService taskService,
                           ProofService proofService,
                           BuyerService buyerService,
-                          FulfillmentService fulfillmentService) {
+                          FulfillmentService fulfillmentService,
+                          AfterSaleService afterSaleService) {
         this.orderService = orderService;
         this.taskService = taskService;
         this.proofService = proofService;
         this.buyerService = buyerService;
         this.fulfillmentService = fulfillmentService;
+        this.afterSaleService = afterSaleService;
     }
 
     public Map<String, Object> buildFunnelMetrics() {
@@ -104,6 +107,38 @@ public class MetricsService {
         payload.put("shipment_signed_total", Long.valueOf(shipmentSigned));
         payload.put("signed_within_7_15_days_total", Long.valueOf(signedWithinSevenToFifteenDays));
         payload.put("signed_within_7_15_days_rate", Double.valueOf(signedWithinTargetRate));
+        return payload;
+    }
+
+    public Map<String, Object> buildAfterSaleRiskMetrics() {
+        long openCases = afterSaleService.countOpenCases();
+        long pendingArbitration = afterSaleService.countPendingArbitrationCases();
+        long resolvedCases = afterSaleService.countResolvedCases();
+        long counterfeitDisputes = afterSaleService.countCounterfeitDisputes();
+        long partialRefundApproved = afterSaleService.countApprovedPartialRefundCases();
+        long cancelledOrders = orderService.countCancelledOrders();
+        long totalOrders = orderService.countTotalOrders();
+        long paidOrders = orderService.countPaidOrders();
+
+        double counterfeitComplaintRate = 0D;
+        if (paidOrders > 0L) {
+            counterfeitComplaintRate = (counterfeitDisputes * 1.0D) / paidOrders;
+        }
+
+        double orderCancelRate = 0D;
+        if (totalOrders > 0L) {
+            orderCancelRate = (cancelledOrders * 1.0D) / totalOrders;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("after_sale_open_cases_total", Long.valueOf(openCases));
+        payload.put("after_sale_pending_arbitration_total", Long.valueOf(pendingArbitration));
+        payload.put("after_sale_resolved_total", Long.valueOf(resolvedCases));
+        payload.put("counterfeit_dispute_total", Long.valueOf(counterfeitDisputes));
+        payload.put("counterfeit_complaint_rate", Double.valueOf(counterfeitComplaintRate));
+        payload.put("partial_refund_approved_total", Long.valueOf(partialRefundApproved));
+        payload.put("order_cancelled_total", Long.valueOf(cancelledOrders));
+        payload.put("order_cancel_rate", Double.valueOf(orderCancelRate));
         return payload;
     }
 }

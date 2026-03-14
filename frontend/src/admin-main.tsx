@@ -72,6 +72,20 @@ interface FulfillmentDetail {
   timeline: Array<Record<string, unknown>>;
 }
 
+interface AfterSaleCaseItem {
+  caseId: number;
+  orderId: number;
+  taskId: number | null;
+  caseType: string;
+  caseStatus: string;
+  issueReason: string;
+  replacementSkuName: string | null;
+  suggestedRefundAmount: string | null;
+  userDecision: string | null;
+  riskLevel: string;
+  createdAt: string;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -123,6 +137,11 @@ function AdminApp(): JSX.Element {
   const [shipmentLatestNode, setShipmentLatestNode] = useState('深圳分拨中心已揽收');
   const [fulfillmentOrderId, setFulfillmentOrderId] = useState('');
   const [fulfillmentDetail, setFulfillmentDetail] = useState<FulfillmentDetail | null>(null);
+  const [pendingAfterSaleCases, setPendingAfterSaleCases] = useState<AfterSaleCaseItem[]>([]);
+  const [afterSaleCaseId, setAfterSaleCaseId] = useState('');
+  const [afterSaleDecision, setAfterSaleDecision] = useState('APPROVE_REPLACEMENT');
+  const [afterSaleComment, setAfterSaleComment] = useState('同意按规则执行');
+  const [finalRefundAmount, setFinalRefundAmount] = useState('20.00');
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -184,6 +203,18 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadPendingAfterSaleCases = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<AfterSaleCaseItem[]>('/api/v1/admin/after-sale/cases/pending');
+      setPendingAfterSaleCases(payload);
+      if (!afterSaleCaseId && payload.length > 0) {
+        setAfterSaleCaseId(String(payload[0].caseId));
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
@@ -192,6 +223,7 @@ function AdminApp(): JSX.Element {
       await loadOutOfStockAlerts();
       await loadPendingBuyerApplications();
       await loadTimeoutCandidates();
+      await loadPendingAfterSaleCases();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -478,6 +510,31 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const arbitrateAfterSaleCase = async (): Promise<void> => {
+    if (!afterSaleCaseId) {
+      setMessage('请输入售后工单 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/admin/after-sale/cases/${afterSaleCaseId}/arbitrate`, {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId),
+          decision: afterSaleDecision,
+          comment: afterSaleComment.trim() || undefined,
+          finalRefundAmount: finalRefundAmount.trim() ? Number(finalRefundAmount) : undefined
+        }
+      });
+      await loadPendingAfterSaleCases();
+      setMessage('售后仲裁已提交');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -636,6 +693,37 @@ function AdminApp(): JSX.Element {
           <button onClick={loadFulfillmentDetail} disabled={busy}>查询履约详情</button>
         </div>
         <pre>{JSON.stringify(fulfillmentDetail, null, 2)}</pre>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 7 售后与风控仲裁台</h2>
+        <div className="grid grid-2">
+          <button onClick={loadPendingAfterSaleCases} disabled={busy}>刷新待仲裁工单</button>
+        </div>
+        <pre>{JSON.stringify(pendingAfterSaleCases, null, 2)}</pre>
+        <div className="grid grid-2">
+          <label>
+            售后工单 ID
+            <input value={afterSaleCaseId} onChange={(e) => setAfterSaleCaseId(e.target.value)} />
+          </label>
+          <label>
+            仲裁结果
+            <select value={afterSaleDecision} onChange={(e) => setAfterSaleDecision(e.target.value)}>
+              <option value="APPROVE_REPLACEMENT">APPROVE_REPLACEMENT</option>
+              <option value="APPROVE_PARTIAL_REFUND">APPROVE_PARTIAL_REFUND</option>
+              <option value="REJECT_CLAIM">REJECT_CLAIM</option>
+            </select>
+          </label>
+          <label>
+            最终退款金额
+            <input value={finalRefundAmount} onChange={(e) => setFinalRefundAmount(e.target.value)} />
+          </label>
+          <label>
+            仲裁备注
+            <textarea value={afterSaleComment} onChange={(e) => setAfterSaleComment(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={arbitrateAfterSaleCase} disabled={busy}>提交售后仲裁</button>
       </div>
 
       <div className="card grid grid-2">

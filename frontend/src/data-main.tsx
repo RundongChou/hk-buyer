@@ -50,31 +50,45 @@ interface FulfillmentMetrics {
   signed_within_7_15_days_rate: number;
 }
 
+interface AfterSaleRiskMetrics {
+  after_sale_open_cases_total: number;
+  after_sale_pending_arbitration_total: number;
+  after_sale_resolved_total: number;
+  counterfeit_dispute_total: number;
+  counterfeit_complaint_rate: number;
+  partial_refund_approved_total: number;
+  order_cancelled_total: number;
+  order_cancel_rate: number;
+}
+
 function DataApp(): JSX.Element {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [catalogMetrics, setCatalogMetrics] = useState<CatalogMetrics | null>(null);
   const [buyerMetrics, setBuyerMetrics] = useState<BuyerFulfillmentMetrics | null>(null);
   const [dynamicMetrics, setDynamicMetrics] = useState<DynamicPricingMetrics | null>(null);
   const [fulfillmentMetrics, setFulfillmentMetrics] = useState<FulfillmentMetrics | null>(null);
+  const [afterSaleRiskMetrics, setAfterSaleRiskMetrics] = useState<AfterSaleRiskMetrics | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadMetrics = async (): Promise<void> => {
     setBusy(true);
     try {
-      const [funnelPayload, catalogPayload, buyerPayload, dynamicPayload, fulfillmentPayload] = await Promise.all([
+      const [funnelPayload, catalogPayload, buyerPayload, dynamicPayload, fulfillmentPayload, afterSaleRiskPayload] = await Promise.all([
         apiRequest<FunnelMetrics>('/api/v1/admin/metrics/funnel'),
         apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog'),
         apiRequest<BuyerFulfillmentMetrics>('/api/v1/admin/metrics/buyer-fulfillment'),
         apiRequest<DynamicPricingMetrics>('/api/v1/admin/metrics/dynamic-pricing'),
-        apiRequest<FulfillmentMetrics>('/api/v1/admin/metrics/fulfillment')
+        apiRequest<FulfillmentMetrics>('/api/v1/admin/metrics/fulfillment'),
+        apiRequest<AfterSaleRiskMetrics>('/api/v1/admin/metrics/after-sale-risk')
       ]);
       setFunnelMetrics(funnelPayload);
       setCatalogMetrics(catalogPayload);
       setBuyerMetrics(buyerPayload);
       setDynamicMetrics(dynamicPayload);
       setFulfillmentMetrics(fulfillmentPayload);
-      setMessage('漏斗、商品库存、买手履约、动态提价、仓配清关指标已刷新');
+      setAfterSaleRiskMetrics(afterSaleRiskPayload);
+      setMessage('漏斗、商品库存、买手履约、动态提价、仓配清关、售后风控指标已刷新');
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -205,6 +219,38 @@ function DataApp(): JSX.Element {
           <div className="badge">signed_within_7_15_days_rate</div>
           <h2>{fulfillmentMetrics?.signed_within_7_15_days_rate ?? '-'}</h2>
         </div>
+        <div>
+          <div className="badge">after_sale_open_cases_total</div>
+          <h2>{afterSaleRiskMetrics?.after_sale_open_cases_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">after_sale_pending_arbitration_total</div>
+          <h2>{afterSaleRiskMetrics?.after_sale_pending_arbitration_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">after_sale_resolved_total</div>
+          <h2>{afterSaleRiskMetrics?.after_sale_resolved_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">counterfeit_dispute_total</div>
+          <h2>{afterSaleRiskMetrics?.counterfeit_dispute_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">counterfeit_complaint_rate</div>
+          <h2>{afterSaleRiskMetrics?.counterfeit_complaint_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">partial_refund_approved_total</div>
+          <h2>{afterSaleRiskMetrics?.partial_refund_approved_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">order_cancelled_total</div>
+          <h2>{afterSaleRiskMetrics?.order_cancelled_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">order_cancel_rate</div>
+          <h2>{afterSaleRiskMetrics?.order_cancel_rate ?? '-'}</h2>
+        </div>
       </div>
       <div className="card">
         <strong>消息：</strong> {message}
@@ -228,6 +274,10 @@ function DataApp(): JSX.Element {
       <div className="card">
         <h2>仓配清关链路指标</h2>
         <pre>{JSON.stringify(fulfillmentMetrics, null, 2)}</pre>
+      </div>
+      <div className="card">
+        <h2>售后风控指标</h2>
+        <pre>{JSON.stringify(afterSaleRiskMetrics, null, 2)}</pre>
       </div>
     </div>
   );

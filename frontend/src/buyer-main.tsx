@@ -53,6 +53,9 @@ function BuyerApp(): JSX.Element {
   const [batchNo, setBatchNo] = useState('BATCH-20260314');
   const [expiryDate, setExpiryDate] = useState('2027-03-14');
   const [productPhotoUrl, setProductPhotoUrl] = useState('https://example.com/product.jpg');
+  const [stockoutReason, setStockoutReason] = useState('门店缺货，建议更换相近规格');
+  const [replacementSkuName, setReplacementSkuName] = useState('港版维C精华 20ml');
+  const [suggestedRefundAmount, setSuggestedRefundAmount] = useState('20.00');
   const [warehouseCode, setWarehouseCode] = useState('HK-WH-01');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -184,6 +187,30 @@ function BuyerApp(): JSX.Element {
     }
   };
 
+  const reportStockout = async (): Promise<void> => {
+    if (!taskId) {
+      setMessage('请输入任务 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/buyer/tasks/${taskId}/stockout-report`, {
+        method: 'POST',
+        body: {
+          buyerId: Number(buyerId),
+          issueReason: stockoutReason,
+          replacementSkuName: replacementSkuName.trim() || undefined,
+          suggestedRefundAmount: suggestedRefundAmount.trim() ? Number(suggestedRefundAmount) : undefined
+        }
+      });
+      setMessage('缺货工单已上报，等待用户决策');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>买手端</h1>
@@ -262,6 +289,25 @@ function BuyerApp(): JSX.Element {
 
       <div className="card">
         <button onClick={submitProof} disabled={busy}>提交凭证</button>
+      </div>
+
+      <div className="card grid grid-2">
+        <label>
+          缺货原因
+          <textarea value={stockoutReason} onChange={(e) => setStockoutReason(e.target.value)} />
+        </label>
+        <label>
+          替代商品建议
+          <input value={replacementSkuName} onChange={(e) => setReplacementSkuName(e.target.value)} />
+        </label>
+        <label>
+          建议部分退款金额
+          <input value={suggestedRefundAmount} onChange={(e) => setSuggestedRefundAmount(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="card">
+        <button onClick={reportStockout} disabled={busy}>提交缺货上报</button>
       </div>
 
       <div className="card grid grid-2">

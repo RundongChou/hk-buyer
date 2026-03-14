@@ -81,6 +81,18 @@ public class OrderRepository {
         return result == null ? 0L : result.longValue();
     }
 
+    public long countCancelledOrders() {
+        String sql = "SELECT COUNT(1) FROM order_main WHERE order_status = ?";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, OrderStatus.CANCELLED.name());
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countTotalOrders() {
+        String sql = "SELECT COUNT(1) FROM order_main";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0L : result.longValue();
+    }
+
     private RowMapper<OrderMain> orderMainRowMapper() {
         return (rs, rowNum) -> {
             OrderMain item = new OrderMain();

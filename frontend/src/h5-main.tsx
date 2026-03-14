@@ -74,6 +74,23 @@ interface FulfillmentDetail {
   timeline: TimelineEvent[];
 }
 
+interface AfterSaleCaseItem {
+  caseId: number;
+  orderId: number;
+  taskId: number | null;
+  caseType: string;
+  caseStatus: string;
+  issueReason: string;
+  replacementSkuName: string | null;
+  suggestedRefundAmount: string | null;
+  negotiatedRefundAmount: string | null;
+  userDecision: string | null;
+  arbitrationResult: string | null;
+  riskLevel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function H5App(): JSX.Element {
   const [userId, setUserId] = useState('10001');
   const [qty, setQty] = useState('1');
@@ -88,6 +105,12 @@ function H5App(): JSX.Element {
   const [orderDetail, setOrderDetail] = useState<unknown>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [fulfillmentDetail, setFulfillmentDetail] = useState<FulfillmentDetail | null>(null);
+  const [afterSaleCases, setAfterSaleCases] = useState<AfterSaleCaseItem[]>([]);
+  const [authIssueReason, setAuthIssueReason] = useState('怀疑商品非正品，申请平台核验');
+  const [authEvidenceUrl, setAuthEvidenceUrl] = useState('https://example.com/evidence.jpg');
+  const [afterSaleCaseId, setAfterSaleCaseId] = useState('');
+  const [afterSaleDecision, setAfterSaleDecision] = useState<'ACCEPT_REPLACEMENT' | 'REQUEST_PARTIAL_REFUND'>('ACCEPT_REPLACEMENT');
+  const [afterSaleComment, setAfterSaleComment] = useState('同意按平台建议处理');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -306,6 +329,83 @@ function H5App(): JSX.Element {
     }
   };
 
+  const loadAfterSaleCases = async (): Promise<void> => {
+    if (!orderId) {
+      setMessage('请先输入订单号');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const payload = await apiRequest<AfterSaleCaseItem[]>(
+        `/api/v1/orders/${orderId}/after-sale/cases?userId=${Number(userId)}`
+      );
+      setAfterSaleCases(payload);
+      if (!afterSaleCaseId && payload.length > 0) {
+        setAfterSaleCaseId(String(payload[0].caseId));
+      }
+      setMessage(`售后工单已刷新，共 ${payload.length} 条`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createAuthenticityDispute = async (): Promise<void> => {
+    if (!orderId) {
+      setMessage('请先输入订单号');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      await apiRequest(`/api/v1/orders/${orderId}/after-sale/authenticity`, {
+        method: 'POST',
+        body: {
+          userId: Number(userId),
+          issueReason: authIssueReason,
+          evidenceUrl: authEvidenceUrl.trim() || undefined
+        }
+      });
+      await loadAfterSaleCases();
+      setMessage('真伪争议工单已提交');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitAfterSaleUserDecision = async (): Promise<void> => {
+    if (!orderId) {
+      setMessage('请先输入订单号');
+      return;
+    }
+    if (!afterSaleCaseId) {
+      setMessage('请输入售后工单 ID');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      await apiRequest(`/api/v1/orders/${orderId}/after-sale/cases/${afterSaleCaseId}/decision`, {
+        method: 'POST',
+        body: {
+          userId: Number(userId),
+          decision: afterSaleDecision,
+          comment: afterSaleComment.trim() || undefined
+        }
+      });
+      await loadAfterSaleCases();
+      setMessage('售后方案决策已提交，等待平台仲裁');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>H5 用户端（交易稳态 V2）</h1>
@@ -402,6 +502,43 @@ function H5App(): JSX.Element {
           <button onClick={loadOrder} disabled={busy}>刷新订单与时间线</button>
           <button onClick={loadFulfillment} disabled={busy}>刷新履约详情</button>
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 7 售后中心</h2>
+        <div className="grid grid-2">
+          <label>
+            真伪争议说明
+            <textarea value={authIssueReason} onChange={(e) => setAuthIssueReason(e.target.value)} />
+          </label>
+          <label>
+            证据 URL
+            <input value={authEvidenceUrl} onChange={(e) => setAuthEvidenceUrl(e.target.value)} />
+          </label>
+        </div>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <button onClick={createAuthenticityDispute} disabled={busy}>发起真伪争议</button>
+          <button onClick={loadAfterSaleCases} disabled={busy}>刷新售后工单</button>
+        </div>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            售后工单 ID
+            <input value={afterSaleCaseId} onChange={(e) => setAfterSaleCaseId(e.target.value)} />
+          </label>
+          <label>
+            用户决策
+            <select value={afterSaleDecision} onChange={(e) => setAfterSaleDecision(e.target.value as 'ACCEPT_REPLACEMENT' | 'REQUEST_PARTIAL_REFUND')}>
+              <option value="ACCEPT_REPLACEMENT">ACCEPT_REPLACEMENT</option>
+              <option value="REQUEST_PARTIAL_REFUND">REQUEST_PARTIAL_REFUND</option>
+            </select>
+          </label>
+          <label>
+            决策备注
+            <textarea value={afterSaleComment} onChange={(e) => setAfterSaleComment(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={submitAfterSaleUserDecision} disabled={busy}>提交售后决策</button>
+        <pre>{JSON.stringify(afterSaleCases, null, 2)}</pre>
       </div>
 
       {message ? (
