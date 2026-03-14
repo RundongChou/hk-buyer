@@ -1,0 +1,10 @@
+# frontend
+frontend/node_modules/
+frontend/dist/
+
+# backend
+backend/target/
+
+# ide
+.idea/
+.DS_Store

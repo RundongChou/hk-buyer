@@ -1,0 +1,30 @@
+## Sprint 1
+- 日期：2026-03-14
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：1
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 1 PRD（2026-03-14）`
+- 分支：main
+- Commit：待提交
+- Push 结果：待 push
+- CI 结果：未触发（本地执行）
+- 当前项目现状：已具备前后端分离最小交易闭环代码骨架与 MySQL DDL。
+- 上一 Sprint 目标回顾：无（仓库此前无 Sprint 记录）
+- 上一 Sprint 是否按预期完成：N/A
+- 偏差与原因：N/A
+- 本次 Sprint 目标：交付 Roadmap Sprint 1 最小闭环切片（下单支付->任务->接单->凭证->审核->时间线）。
+- 本次实际完成：完成 PRD、后端 API、前端四端 TSX 多入口、MySQL 初始化脚本与前端测试验证。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V1__sprint1_mvp.sql`，包含 `order_main/order_item/procurement_task/purchase_proof/order_timeline_event` 与四个关键索引。
+- 前端相关变更（TypeScript + JSX 页面/交互）：新增 H5/买手端/管理后台/数据平台四个 TSX 入口页面与 API 调用。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增订单、买手任务、凭证审核、漏斗指标 API 与状态机服务层。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：实现接单与凭证审核链路，入仓/清关/物流保留合规状态扩展点。
+- 本次验证与测试结果：`frontend` 的 `npm run test/typecheck/build` 全通过；`backend` 因环境缺少 Java/Maven 阻塞（`mvn` 不存在）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 1 对齐，范围控制在最小闭环。
+- 架构师：前后端分离、状态机集中在服务层，数据库为 MySQL DDL。
+- 测试：前端自动化已通过，后端自动化待 Java 环境补齐后执行。
+- 运营：已可演示任务发布、接单、凭证审核与漏斗计数。
+- 用户：可见订单状态时间线，透明度提升。
+- 当前风险与技术债：后端未在本地完成编译/测试；缺少支付回调补偿与清关物流真实对接。
+- 下一 Sprint 建议目标：Roadmap Sprint 2 商品与库存中台（SPU/SKU + 库存快照 + 上下架流程）。
+- 下一 Sprint 验收标准：500+ SKU 检索、缺货不可误售、前后台库存状态一致。
+- 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
