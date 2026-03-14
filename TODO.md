@@ -121,3 +121,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 5（72h 无人接单自动提价、24h 频控、自动重派）。
 - 下一 Sprint 验收标准：72h 超时任务可自动提价与重派，且提价后接单转化率可统计。
 - 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
+
+## Sprint 5
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：5
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 5 PRD（2026-03-15）`
+- 分支：main
+- Commit：`5d0160c`（feat(sprint5): automate timeout repricing and redispatch engine）
+- Push 结果：已成功 push 到 `origin/main`（`6ed0a95..5d0160c`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已具备动态加价与重派引擎最小闭环（72h 超时识别、自动提价、24h 频控、最多 3 次、封顶终止、后台执行与数据观测）。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 4 买手履约体系 V2（买手入驻审核、任务分层、接单 SLA、信誉分）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 与本 Sprint 的后端自动化测试均受本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 5 动态加价与重派引擎（72h 自动提价执行器、24h 频控、3 次上限与终止规则）。
+- 本次实际完成：完成 Sprint 5 PRD；新增超时任务自动提价与重派服务；新增后台候选查询与执行接口；新增动态提价指标接口与前端展示；新增 MySQL V5 迁移。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V5__sprint5_dynamic_markup_engine.sql`，为 `procurement_task` 增加 `markup_applied_count/redispatch_count/last_markup_at/next_markup_eligible_at/terminal_reason` 及索引 `idx_task_timeout_scan`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`admin-main.tsx` 新增 Sprint 5 动态提价执行台；`data-main.tsx` 新增动态提价指标卡；`buyer-main.tsx` 增加任务提价与重派字段展示。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：扩展 `TaskService/TaskRepository` 实现自动提价、重派、频控与终止；扩展 `AdminController` 新增 `/api/v1/admin/tasks/timeout-candidates`、`/api/v1/admin/tasks/timeout-reprice/run`、`/api/v1/admin/metrics/dynamic-pricing`；扩展 `MetricsService` 输出动态提价指标。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：强化“任务发布 -> 超时识别 -> 自动提价 -> 重派/终止”接单治理链路；未改动入仓/清关/物流实现。
+- 本次验证与测试结果：`frontend` 的 `npm run test/typecheck/build` 全通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 5 对齐，具备可演示自动提价与重派闭环。
+- 架构师：保持前后端分离，后端仍为 Java8 + SpringMVC + JDBC + MySQL。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 环境补跑。
+- 运营：可在后台查看候选任务并触发引擎，数据平台可观测执行结果与转化。
+- 用户：可降低“支付后长期无人接单”的等待概率，履约预期更稳定。
+- 当前风险与技术债：后端测试未在本机执行；自动提价策略仍为固定规则，未结合毛利和类目弹性动态调参。
+- 下一 Sprint 建议目标：Roadmap Sprint 6（交仓、质检、合规清关、物流轨迹回传）。
+- 下一 Sprint 验收标准：交仓 -> 入库 -> 清关 -> 国内运输 -> 签收链路可演示，且清关成功率与 7-15 天履约指标可观测。
+- 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
