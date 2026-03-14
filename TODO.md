@@ -214,3 +214,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 8（分账结算与财务对账闭环）。
 - 下一 Sprint 验收标准：订单签收后可自动分账并支持买手结算、平台费核算与对账报表；结算准确率口径可观测。
 - 勘误/补充说明：全程遵守合规边界，仅实现合规售后与清关路径，不实现任何绕关/走私能力。
+
+## Sprint 8
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：8
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 8 PRD（2026-03-15）`
+- 分支：main
+- Commit：`d698b1f`（feat(sprint8): deliver settlement and reconciliation finance loop）
+- Push 结果：已成功 push 到 `origin/main`（`49c7542..d698b1f`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已形成“签收 -> 自动分账 -> 买手申请结算 -> 后台放款确认 -> 对账报表/指标”最小闭环。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 7 售后与风控闭环（缺货替代、部分退款、真伪争议、仲裁台）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 与本 Sprint 的后端自动化测试均受本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 8 分账结算与财务对账 V1（自动分账、买手结算、平台费核算、对账报表）。
+- 本次实际完成：完成 Sprint 8 PRD；新增结算台账模型与签收后自动分账逻辑；新增买手结算申请、后台放款与对账接口；买手端/后台/数据平台新增结算能力展示。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V8__sprint8_settlement_finance.sql`，创建 `settlement_ledger` 表（`uk_settlement_order`、`idx_settlement_buyer_status`、`idx_settlement_status_recon`）并扩展 `buyer_profile.settlement_account`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`buyer-main.tsx` 新增结算中心；`admin-main.tsx` 新增财务结算与对账台；`data-main.tsx` 新增结算指标展示；所有改动均为 TSX。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `SettlementService/SettlementRepository/SettlementLedger`；新增接口 `/api/v1/buyer/settlements*`、`/api/v1/admin/settlements*`、`/api/v1/admin/metrics/settlement`；`FulfillmentService` 在签收时自动生成分账台账；`MetricsService` 增加结算指标。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：在既有“签收”节点后补齐财务闭环，形成履约后结算链路；未改动合规清关路径。
+- 本次验证与测试结果：`cd frontend && npm run test` 通过（1 文件 / 4 用例）；`cd frontend && npm run typecheck` 通过；`cd frontend && npm run build` 通过；`java -version` 失败（未安装 Java Runtime）；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 8 对齐，签收后资金闭环可演示。
+- 架构师：保持前后端分离，结算能力以 Java8 + SpringMVC + MySQL 增量扩展。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 环境补跑。
+- 运营：可在后台处理待放款台账并提交对账结论，管理效率提升。
+- 用户：间接受益于买手履约稳定性提升与售后后置处理确定性。
+- 当前风险与技术债：未接入真实支付出款回执；结算分账规则为 V1 固定比例；后端自动化测试未在本机执行。
+- 下一 Sprint 建议目标：Roadmap Sprint 9（运营增长与复购 V1：会员权益、活动、推荐、触达）。
+- 下一 Sprint 验收标准：复购激励链路可演示，用户分层触达可配置，转化漏斗与复购指标可观测。
+- 勘误/补充说明：全程遵守合规边界，仅实现合规清关与合规结算流程，不实现任何绕关/走私能力。
