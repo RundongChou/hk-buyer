@@ -90,3 +90,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 4（买手入驻审核、任务分层、接单 SLA、信誉分）。
 - 下一 Sprint 验收标准：买手准入->抢单->履约->评分沉淀完整可演示，72h 接单 SLA 可统计。
 - 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
+
+## Sprint 4
+- 日期：2026-03-14
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：4
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 4 PRD（2026-03-14）`
+- 分支：main
+- Commit：`84407ea`（feat(sprint4): deliver buyer onboarding with tiered task dispatch）
+- Push 结果：已成功 push 到 `origin/main`（`9c7360a..84407ea`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已具备买手履约体系 V2 最小闭环（入驻审核、任务分层、接单准入校验、信誉分与奖惩沉淀、SLA 指标可观测）。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 3 交易与支付稳态 V2（购物车、优惠券、税费估算、支付失败补偿）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 与本 Sprint 的后端自动化测试均因本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 4 买手履约体系 V2（买手入驻审核、任务分层、接单 SLA、信誉分）。
+- 本次实际完成：完成 Sprint 4 PRD；新增买手入驻申请与后台审核接口；新增买手档案与任务分层派发字段；接单接口增加准入校验；凭证审核结果自动更新信誉分与等级；数据平台新增买手履约指标。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V4__sprint4_buyer_fulfillment.sql`，包含 `buyer_onboarding_application`、`buyer_profile`，并为 `procurement_task` 增加 `task_tier/required_buyer_level/target_region/target_category/sla_hours` 与 `idx_task_dispatch`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`buyer-main.tsx` 新增入驻申请与档案查询、按买手筛选任务；`admin-main.tsx` 新增买手入驻审核台；`data-main.tsx` 新增买手履约指标卡。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `BuyerController`、`BuyerService`、`BuyerRepository`、买手 DTO 与领域模型；扩展 `TaskService/TaskRepository` 实现分层派发和接单准入；扩展 `ProofService` 实现信誉分奖惩；扩展 `MetricsService` 输出买手履约指标。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：强化“任务发布 -> 分层派发 -> 准入接单 -> 凭证审核 -> 信誉沉淀”链路；未改动入仓/清关/物流实现。
+- 本次验证与测试结果：`frontend` 的 `npm run test/typecheck/build` 全通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）；`java -version` 失败（未安装 Java Runtime）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 4 对齐，买手履约治理闭环已形成。
+- 架构师：保持前后端分离，后端仍为 Java8 + SpringMVC + JDBC + MySQL。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8/Maven 环境补跑。
+- 运营：可执行买手准入审核并查看买手履约指标，便于供给治理。
+- 用户：间接受益于接单稳定性提升与更可控的履约体验。
+- 当前风险与技术债：后端自动化测试未在本机执行；任务分层当前按订单金额和首个 SKU 品类生成，后续可升级多 SKU 加权策略。
+- 下一 Sprint 建议目标：Roadmap Sprint 5（72h 无人接单自动提价、24h 频控、自动重派）。
+- 下一 Sprint 验收标准：72h 超时任务可自动提价与重派，且提价后接单转化率可统计。
+- 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
