@@ -13,7 +13,6 @@ public class CreateOrderItemRequest {
     @Min(1)
     private Integer qty;
 
-    @NotNull
     private BigDecimal unitPrice;
 
     public Long getSkuId() {

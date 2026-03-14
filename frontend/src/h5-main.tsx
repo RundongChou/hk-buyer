@@ -17,32 +17,82 @@ interface TimelineEvent {
   createdAt: string;
 }
 
+interface CatalogSku {
+  skuId: number;
+  spuId: number;
+  spuName: string;
+  skuName: string;
+  specValue: string;
+  publishStatus: string;
+  finalPrice: string;
+  availableQty: number;
+  stockStatus: string;
+  saleable: boolean;
+}
+
 function H5App(): JSX.Element {
   const [userId, setUserId] = useState('10001');
-  const [skuId, setSkuId] = useState('9001');
+  const [skuId, setSkuId] = useState('');
   const [qty, setQty] = useState('1');
-  const [unitPrice, setUnitPrice] = useState('128.00');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [catalogSkus, setCatalogSkus] = useState<CatalogSku[]>([]);
   const [orderId, setOrderId] = useState('');
   const [orderDetail, setOrderDetail] = useState<unknown>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  const createOrder = async (): Promise<void> => {
+  const loadCatalog = async (): Promise<void> => {
     setBusy(true);
     setMessage('');
     try {
+      const query = keyword.trim();
+      const path = query.length > 0
+        ? `/api/v1/catalog/skus?keyword=${encodeURIComponent(query)}&onlyPublished=true`
+        : '/api/v1/catalog/skus?onlyPublished=true';
+      const payload = await apiRequest<CatalogSku[]>(path);
+      setCatalogSkus(payload);
+      setMessage(`SKU 列表已刷新，共 ${payload.length} 条`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickSku = (sku: CatalogSku): void => {
+    setSkuId(String(sku.skuId));
+    setUnitPrice(String(sku.finalPrice));
+    if (!sku.saleable) {
+      setMessage(`SKU ${sku.skuId} 当前缺货，仅可查看不可下单`);
+      return;
+    }
+    setMessage(`已选择 SKU ${sku.skuId}，将按系统价 ${sku.finalPrice} 下单`);
+  };
+
+  const createOrder = async (): Promise<void> => {
+    if (!skuId) {
+      setMessage('请先选择 SKU 或输入 SKU ID');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const itemPayload: Record<string, number> = {
+        skuId: Number(skuId),
+        qty: Number(qty)
+      };
+      const normalizedPrice = unitPrice.trim();
+      if (normalizedPrice) {
+        itemPayload.unitPrice = Number(normalizedPrice);
+      }
+
       const payload = await apiRequest<OrderCreateResponse>('/api/v1/orders', {
         method: 'POST',
         body: {
           userId: Number(userId),
-          items: [
-            {
-              skuId: Number(skuId),
-              qty: Number(qty),
-              unitPrice: Number(unitPrice)
-            }
-          ]
+          items: [itemPayload]
         }
       });
       setOrderId(String(payload.orderId));
@@ -101,6 +151,28 @@ function H5App(): JSX.Element {
       <h1>H5 用户端</h1>
       <div className="card grid grid-2">
         <label>
+          搜索关键词
+          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="商品名/品牌" />
+        </label>
+        <div style={{ alignSelf: 'end' }}>
+          <button onClick={loadCatalog} disabled={busy}>搜索 SKU</button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>SKU 搜索结果（仅已上架）</h2>
+        <pre>{JSON.stringify(catalogSkus, null, 2)}</pre>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          {catalogSkus.slice(0, 6).map((sku) => (
+            <button key={sku.skuId} onClick={() => pickSku(sku)} disabled={busy}>
+              选中 #{sku.skuId} {sku.skuName} / {sku.stockStatus}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card grid grid-2">
+        <label>
           用户 ID
           <input value={userId} onChange={(e) => setUserId(e.target.value)} />
         </label>
@@ -113,7 +185,7 @@ function H5App(): JSX.Element {
           <input value={qty} onChange={(e) => setQty(e.target.value)} />
         </label>
         <label>
-          单价
+          单价（可选，优先走系统价）
           <input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
         </label>
       </div>

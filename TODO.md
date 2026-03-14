@@ -28,3 +28,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 2 商品与库存中台（SPU/SKU + 库存快照 + 上下架流程）。
 - 下一 Sprint 验收标准：500+ SKU 检索、缺货不可误售、前后台库存状态一致。
 - 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
+
+## Sprint 2
+- 日期：2026-03-14
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：2
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 2 PRD（2026-03-14）`
+- 分支：main
+- Commit：`待提交`
+- Push 结果：待 push
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已具备商品与库存中台 V1（SPU/SKU、上架审核、库存快照、缺货预警）并与下单链路打通。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 1 最小闭环切片（下单支付->任务->接单->凭证->审核->时间线）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：后端自动化测试因本地缺少 Java/Maven 未执行。
+- 本次 Sprint 目标：交付 Roadmap Sprint 2 商品与库存中台 V1（建品、审核上架、可搜可买、缺货不可误售）。
+- 本次实际完成：完成 Sprint 2 PRD；新增商品库存 MySQL 模型与 API；后台建品/审核/库存调整；H5 SKU 搜索下单；数据平台商品库存指标。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V2__sprint2_catalog_inventory.sql`，包含 `sku_spu/sku_item/sku_price_policy/stock_snapshot/sku_publish_audit_log` 与 `idx_sku_item_publish/idx_sku_item_keyword/idx_stock_snapshot_qty`。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`h5-main.tsx` 新增 SKU 搜索与回填下单；`admin-main.tsx` 新增建品/上架审核/库存调整/缺货预警；`data-main.tsx` 新增商品库存指标。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `CatalogController`、`CatalogAdminController`、`CatalogService`、`CatalogRepository`；`OrderService` 接入上架与库存校验及系统定价。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：新增“缺货降级不可误售”能力，减少无效履约任务发布；未改动清关与物流链路。
+- 本次验证与测试结果：`frontend` 的 `npm run test/typecheck/build` 全通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 2 对齐，完成建品到用户可买闭环。
+- 架构师：维持前后端分离，Spring MVC + JDBC + MySQL 分层清晰。
+- 测试：前端自动化通过；后端测试受环境阻塞待 CI/JDK8 环境补跑。
+- 运营：具备建品、审核上架、库存调整与缺货预警操作能力。
+- 用户：可直接检索上架 SKU 并看到缺货状态，降低误下单。
+- 当前风险与技术债：后端自动化测试未跑；SKU 检索仍为基础 LIKE 查询，未做高阶搜索优化。
+- 下一 Sprint 建议目标：Roadmap Sprint 3（购物车、优惠券、税费估算、支付失败补偿）。
+- 下一 Sprint 验收标准：支付异常可补偿、订单状态一致性可验证、交易成功率提升可量化。
+- 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。

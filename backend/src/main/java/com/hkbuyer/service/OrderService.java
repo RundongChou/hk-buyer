@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,30 +26,38 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
     private final TimelineRepository timelineRepository;
+    private final CatalogService catalogService;
 
     public OrderService(OrderRepository orderRepository,
                         TaskRepository taskRepository,
-                        TimelineRepository timelineRepository) {
+                        TimelineRepository timelineRepository,
+                        CatalogService catalogService) {
         this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
         this.timelineRepository = timelineRepository;
+        this.catalogService = catalogService;
     }
 
     @Transactional
     public Map<String, Object> createOrder(CreateOrderRequest request) {
+        List<CatalogService.ResolvedOrderLine> resolvedLines = new ArrayList<CatalogService.ResolvedOrderLine>();
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (CreateOrderItemRequest item : request.getItems()) {
-            if (item.getUnitPrice().signum() <= 0) {
-                throw new ApiException("unitPrice must be positive");
-            }
-            BigDecimal lineAmount = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQty().longValue()));
+            CatalogService.ResolvedOrderLine resolvedLine = catalogService.resolveOrderLine(
+                    item.getSkuId(),
+                    item.getQty(),
+                    item.getUnitPrice()
+            );
+            resolvedLines.add(resolvedLine);
+            BigDecimal lineAmount = resolvedLine.getUnitPrice().multiply(BigDecimal.valueOf(item.getQty().longValue()));
             totalAmount = totalAmount.add(lineAmount);
         }
 
         long orderId = orderRepository.createOrder(request.getUserId(), totalAmount);
-        for (CreateOrderItemRequest item : request.getItems()) {
-            BigDecimal lineAmount = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQty().longValue()));
-            orderRepository.addItem(orderId, item.getSkuId(), item.getQty(), item.getUnitPrice(), lineAmount);
+        for (CatalogService.ResolvedOrderLine line : resolvedLines) {
+            BigDecimal lineAmount = line.getUnitPrice().multiply(BigDecimal.valueOf(line.getQty().longValue()));
+            orderRepository.addItem(orderId, line.getSkuId(), line.getQty(), line.getUnitPrice(), lineAmount);
+            catalogService.consumeStockForOrder(line, Long.valueOf(orderId));
         }
         timelineRepository.addEvent(orderId, "order_submitted", "订单已提交，待支付");
 
