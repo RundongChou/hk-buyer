@@ -4,7 +4,9 @@ import com.hkbuyer.api.dto.AuditProofRequest;
 import com.hkbuyer.api.dto.ArbitrateAfterSaleCaseRequest;
 import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
 import com.hkbuyer.api.dto.CompleteSettlementPayoutRequest;
+import com.hkbuyer.api.dto.CreateGrowthCampaignRequest;
 import com.hkbuyer.api.dto.InboundScanRequest;
+import com.hkbuyer.api.dto.PublishGrowthCampaignRequest;
 import com.hkbuyer.api.dto.ReconcileSettlementLedgerRequest;
 import com.hkbuyer.api.dto.ReviewCustomsRequest;
 import com.hkbuyer.api.dto.SubmitCustomsRequest;
@@ -12,6 +14,7 @@ import com.hkbuyer.api.dto.UpdateShipmentRequest;
 import com.hkbuyer.service.AfterSaleService;
 import com.hkbuyer.service.BuyerService;
 import com.hkbuyer.service.FulfillmentService;
+import com.hkbuyer.service.GrowthService;
 import com.hkbuyer.service.MetricsService;
 import com.hkbuyer.service.ProofService;
 import com.hkbuyer.service.SettlementService;
@@ -40,6 +43,7 @@ public class AdminController {
     private final FulfillmentService fulfillmentService;
     private final AfterSaleService afterSaleService;
     private final SettlementService settlementService;
+    private final GrowthService growthService;
 
     public AdminController(ProofService proofService,
                            MetricsService metricsService,
@@ -47,7 +51,8 @@ public class AdminController {
                            TaskService taskService,
                            FulfillmentService fulfillmentService,
                            AfterSaleService afterSaleService,
-                           SettlementService settlementService) {
+                           SettlementService settlementService,
+                           GrowthService growthService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
         this.buyerService = buyerService;
@@ -55,6 +60,7 @@ public class AdminController {
         this.fulfillmentService = fulfillmentService;
         this.afterSaleService = afterSaleService;
         this.settlementService = settlementService;
+        this.growthService = growthService;
     }
 
     @GetMapping("/proofs/pending")
@@ -210,5 +216,26 @@ public class AdminController {
     @GetMapping("/metrics/settlement")
     public Map<String, Object> settlementMetrics() {
         return metricsService.buildSettlementMetrics();
+    }
+
+    @PostMapping("/growth/campaigns")
+    public Map<String, Object> createGrowthCampaign(@Valid @RequestBody CreateGrowthCampaignRequest request) {
+        return growthService.createCampaign(request);
+    }
+
+    @GetMapping("/growth/campaigns")
+    public List<Map<String, Object>> listGrowthCampaigns() {
+        return growthService.listCampaigns();
+    }
+
+    @PostMapping("/growth/campaigns/{campaignId}/publish")
+    public Map<String, Object> publishGrowthCampaign(@PathVariable("campaignId") Long campaignId,
+                                                     @Valid @RequestBody PublishGrowthCampaignRequest request) {
+        return growthService.publishCampaign(campaignId, request.getAdminId(), request.getUserIds(), request.getTouchChannel());
+    }
+
+    @GetMapping("/metrics/growth")
+    public Map<String, Object> growthMetrics() {
+        return metricsService.buildGrowthMetrics();
     }
 }

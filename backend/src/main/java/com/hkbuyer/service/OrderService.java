@@ -6,6 +6,7 @@ import com.hkbuyer.api.dto.CreateOrderRequest;
 import com.hkbuyer.domain.CartItem;
 import com.hkbuyer.domain.BuyerLevel;
 import com.hkbuyer.domain.CouponTemplate;
+import com.hkbuyer.domain.GrowthCampaign;
 import com.hkbuyer.domain.OrderItem;
 import com.hkbuyer.domain.OrderMain;
 import com.hkbuyer.domain.OrderStatus;
@@ -43,6 +44,7 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CouponRepository couponRepository;
     private final PaymentCompensationRepository paymentCompensationRepository;
+    private final GrowthService growthService;
 
     public OrderService(OrderRepository orderRepository,
                         TaskRepository taskRepository,
@@ -50,7 +52,8 @@ public class OrderService {
                         CatalogService catalogService,
                         CartRepository cartRepository,
                         CouponRepository couponRepository,
-                        PaymentCompensationRepository paymentCompensationRepository) {
+                        PaymentCompensationRepository paymentCompensationRepository,
+                        GrowthService growthService) {
         this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
         this.timelineRepository = timelineRepository;
@@ -58,6 +61,7 @@ public class OrderService {
         this.cartRepository = cartRepository;
         this.couponRepository = couponRepository;
         this.paymentCompensationRepository = paymentCompensationRepository;
+        this.growthService = growthService;
     }
 
     @Transactional
@@ -98,7 +102,12 @@ public class OrderService {
     @Transactional
     public Map<String, Object> createOrderFromCart(Long userId, String couponCode) {
         CheckoutQuote quote = buildCartQuote(userId, couponCode);
-        long orderId = orderRepository.createOrder(userId, quote.getPayableAmount());
+        long orderId = orderRepository.createOrder(
+                userId,
+                quote.getPayableAmount(),
+                quote.getAppliedCouponCode(),
+                quote.getAppliedCampaignId()
+        );
 
         List<Long> purchasedSkuIds = new ArrayList<Long>();
         for (CatalogService.ResolvedOrderLine line : quote.getResolvedLines()) {
@@ -179,6 +188,8 @@ public class OrderService {
         payload.put("orderStatus", order.getOrderStatus().name());
         payload.put("payStatus", order.getPayStatus());
         payload.put("totalAmount", order.getTotalAmount());
+        payload.put("appliedCouponCode", order.getAppliedCouponCode());
+        payload.put("appliedCampaignId", order.getAppliedCampaignId());
         payload.put("createdAt", order.getCreatedAt());
         payload.put("updatedAt", order.getUpdatedAt());
         payload.put("items", items);
@@ -325,7 +336,9 @@ public class OrderService {
                 couponApplied.getDiscountAmount(),
                 taxAmount,
                 payableAmount,
-                couponApplied.getPayload());
+                couponApplied.getPayload(),
+                couponApplied.getAppliedCouponCode(),
+                couponApplied.getAppliedCampaignId());
     }
 
     private CouponApplied resolveCoupon(String couponCode, BigDecimal goodsAmount) {
@@ -363,8 +376,14 @@ public class OrderService {
         payload.put("discountType", discountType);
         payload.put("discountAmount", discountAmount);
         payload.put("minOrderAmount", minOrderAmount);
+        Optional<GrowthCampaign> campaign = growthService.findActiveCampaignByCouponCode(coupon.getCouponCode(), LocalDateTime.now());
+        Long appliedCampaignId = campaign.isPresent() ? campaign.get().getCampaignId() : null;
+        if (appliedCampaignId != null) {
+            payload.put("campaignId", appliedCampaignId);
+            payload.put("campaignName", campaign.get().getCampaignName());
+        }
 
-        return new CouponApplied(discountAmount, payload);
+        return new CouponApplied(discountAmount, payload, coupon.getCouponCode(), appliedCampaignId);
     }
 
     private String buildCompensationToken(Long orderId) {
@@ -380,6 +399,8 @@ public class OrderService {
         private final BigDecimal taxAmount;
         private final BigDecimal payableAmount;
         private final Map<String, Object> coupon;
+        private final String appliedCouponCode;
+        private final Long appliedCampaignId;
 
         private CheckoutQuote(Long userId,
                               List<Map<String, Object>> items,
@@ -388,7 +409,9 @@ public class OrderService {
                               BigDecimal couponDiscount,
                               BigDecimal taxAmount,
                               BigDecimal payableAmount,
-                              Map<String, Object> coupon) {
+                              Map<String, Object> coupon,
+                              String appliedCouponCode,
+                              Long appliedCampaignId) {
             this.userId = userId;
             this.items = items;
             this.resolvedLines = resolvedLines;
@@ -397,6 +420,8 @@ public class OrderService {
             this.taxAmount = taxAmount;
             this.payableAmount = payableAmount;
             this.coupon = coupon;
+            this.appliedCouponCode = appliedCouponCode;
+            this.appliedCampaignId = appliedCampaignId;
         }
 
         public List<CatalogService.ResolvedOrderLine> getResolvedLines() {
@@ -419,6 +444,14 @@ public class OrderService {
             return payableAmount;
         }
 
+        public String getAppliedCouponCode() {
+            return appliedCouponCode;
+        }
+
+        public Long getAppliedCampaignId() {
+            return appliedCampaignId;
+        }
+
         public Map<String, Object> toPayload() {
             Map<String, Object> payload = new LinkedHashMap<String, Object>();
             payload.put("userId", userId);
@@ -436,14 +469,21 @@ public class OrderService {
     private static class CouponApplied {
         private final BigDecimal discountAmount;
         private final Map<String, Object> payload;
+        private final String appliedCouponCode;
+        private final Long appliedCampaignId;
 
-        private CouponApplied(BigDecimal discountAmount, Map<String, Object> payload) {
+        private CouponApplied(BigDecimal discountAmount,
+                              Map<String, Object> payload,
+                              String appliedCouponCode,
+                              Long appliedCampaignId) {
             this.discountAmount = discountAmount;
             this.payload = payload;
+            this.appliedCouponCode = appliedCouponCode;
+            this.appliedCampaignId = appliedCampaignId;
         }
 
         public static CouponApplied none() {
-            return new CouponApplied(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), null);
+            return new CouponApplied(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), null, null, null);
         }
 
         public BigDecimal getDiscountAmount() {
@@ -452,6 +492,14 @@ public class OrderService {
 
         public Map<String, Object> getPayload() {
             return payload;
+        }
+
+        public String getAppliedCouponCode() {
+            return appliedCouponCode;
+        }
+
+        public Long getAppliedCampaignId() {
+            return appliedCampaignId;
         }
     }
 

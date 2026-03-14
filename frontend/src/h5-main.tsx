@@ -91,6 +91,46 @@ interface AfterSaleCaseItem {
   updatedAt: string;
 }
 
+interface MembershipProfile {
+  userId: number;
+  memberLevel: string;
+  totalPaidOrders: number;
+  totalPaidAmount: string;
+  memberPoints: number;
+  benefits: string[];
+  nextLevel: string;
+  refreshedAt: string;
+}
+
+interface GrowthCouponTouch {
+  touchId: number;
+  campaignId: number;
+  campaignName: string;
+  targetMemberLevel: string;
+  campaignStatus: string;
+  userId: number;
+  touchChannel: string;
+  touchStatus: string;
+  couponCode: string;
+  touchedAt: string;
+  startAt: string;
+  endAt: string;
+}
+
+interface GrowthCouponsPayload {
+  userId: number;
+  memberLevel: string;
+  couponTouches: GrowthCouponTouch[];
+  total: number;
+}
+
+interface GrowthRecommendationsPayload {
+  userId: number;
+  repurchaseRecommendations: CatalogSku[];
+  categoryRecommendations: CatalogSku[];
+  generatedAt: string;
+}
+
 function H5App(): JSX.Element {
   const [userId, setUserId] = useState('10001');
   const [qty, setQty] = useState('1');
@@ -106,6 +146,9 @@ function H5App(): JSX.Element {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [fulfillmentDetail, setFulfillmentDetail] = useState<FulfillmentDetail | null>(null);
   const [afterSaleCases, setAfterSaleCases] = useState<AfterSaleCaseItem[]>([]);
+  const [membershipProfile, setMembershipProfile] = useState<MembershipProfile | null>(null);
+  const [growthCouponTouches, setGrowthCouponTouches] = useState<GrowthCouponTouch[]>([]);
+  const [growthRecommendations, setGrowthRecommendations] = useState<GrowthRecommendationsPayload | null>(null);
   const [authIssueReason, setAuthIssueReason] = useState('怀疑商品非正品，申请平台核验');
   const [authEvidenceUrl, setAuthEvidenceUrl] = useState('https://example.com/evidence.jpg');
   const [afterSaleCaseId, setAfterSaleCaseId] = useState('');
@@ -406,6 +449,34 @@ function H5App(): JSX.Element {
     }
   };
 
+  const loadGrowthCenter = async (): Promise<void> => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const [membershipPayload, couponsPayload, recommendationsPayload] = await Promise.all([
+        apiRequest<MembershipProfile>(`/api/v1/growth/membership?userId=${Number(userId)}`),
+        apiRequest<GrowthCouponsPayload>(`/api/v1/growth/coupons?userId=${Number(userId)}`),
+        apiRequest<GrowthRecommendationsPayload>(`/api/v1/growth/recommendations?userId=${Number(userId)}`)
+      ]);
+      setMembershipProfile(membershipPayload);
+      setGrowthCouponTouches(couponsPayload.couponTouches);
+      setGrowthRecommendations(recommendationsPayload);
+      if (!couponCode.trim() && couponsPayload.couponTouches.length > 0) {
+        setCouponCode(couponsPayload.couponTouches[0].couponCode);
+      }
+      setMessage('会员权益、活动券包与推荐商品已刷新');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyGrowthCoupon = (touch: GrowthCouponTouch): void => {
+    setCouponCode(touch.couponCode);
+    setMessage(`已应用活动券：${touch.couponCode}`);
+  };
+
   return (
     <div className="container">
       <h1>H5 用户端（交易稳态 V2）</h1>
@@ -466,6 +537,36 @@ function H5App(): JSX.Element {
         </label>
         <div style={{ alignSelf: 'end' }}>
           <button onClick={createOrderFromCart} disabled={busy}>购物车下单</button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 9 会员与复购增长中心</h2>
+        <button onClick={loadGrowthCenter} disabled={busy}>刷新会员/券包/推荐</button>
+        <h3>会员档案</h3>
+        <pre>{JSON.stringify(membershipProfile, null, 2)}</pre>
+        <h3>活动券包</h3>
+        <pre>{JSON.stringify(growthCouponTouches, null, 2)}</pre>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          {growthCouponTouches.slice(0, 6).map((touch) => (
+            <button key={touch.touchId} onClick={() => applyGrowthCoupon(touch)} disabled={busy}>
+              应用券 {touch.couponCode}
+            </button>
+          ))}
+        </div>
+        <h3>复购推荐（可一键加购）</h3>
+        <pre>{JSON.stringify(growthRecommendations, null, 2)}</pre>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          {growthRecommendations?.repurchaseRecommendations.slice(0, 4).map((sku) => (
+            <button key={`repurchase-${sku.skuId}`} onClick={() => addToCart(sku.skuId)} disabled={busy || !sku.saleable}>
+              复购加购 #{sku.skuId} {sku.skuName}
+            </button>
+          )) ?? null}
+          {growthRecommendations?.categoryRecommendations.slice(0, 4).map((sku) => (
+            <button key={`category-${sku.skuId}`} onClick={() => addToCart(sku.skuId)} disabled={busy || !sku.saleable}>
+              同类推荐加购 #{sku.skuId} {sku.skuName}
+            </button>
+          )) ?? null}
         </div>
       </div>
 

@@ -119,6 +119,19 @@ interface SettlementReconciliationReport {
   settlement_platform_service_amount_total: string;
 }
 
+interface GrowthCampaignItem {
+  campaignId: number;
+  campaignName: string;
+  targetMemberLevel: string;
+  couponCode: string;
+  campaignStatus: string;
+  startAt: string;
+  endAt: string;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -181,6 +194,15 @@ function AdminApp(): JSX.Element {
   const [reconciliationDecision, setReconciliationDecision] = useState('MATCHED');
   const [reconciliationExceptionReason, setReconciliationExceptionReason] = useState('到账金额与账单不一致');
   const [reconciliationReport, setReconciliationReport] = useState<SettlementReconciliationReport | null>(null);
+  const [growthCampaigns, setGrowthCampaigns] = useState<GrowthCampaignItem[]>([]);
+  const [growthCampaignName, setGrowthCampaignName] = useState('Sprint9 复购激励活动');
+  const [growthTargetLevel, setGrowthTargetLevel] = useState('ALL');
+  const [growthCouponCode, setGrowthCouponCode] = useState('SPRINT3OFF20');
+  const [growthStartAt, setGrowthStartAt] = useState('2026-03-15T00:00:00');
+  const [growthEndAt, setGrowthEndAt] = useState('2026-12-31T23:59:59');
+  const [publishCampaignId, setPublishCampaignId] = useState('');
+  const [publishUserIds, setPublishUserIds] = useState('10001,10002,10003');
+  const [publishTouchChannel, setPublishTouchChannel] = useState('IN_APP');
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -275,6 +297,18 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadGrowthCampaigns = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<GrowthCampaignItem[]>('/api/v1/admin/growth/campaigns');
+      setGrowthCampaigns(payload);
+      if (!publishCampaignId && payload.length > 0) {
+        setPublishCampaignId(String(payload[0].campaignId));
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
@@ -286,6 +320,7 @@ function AdminApp(): JSX.Element {
       await loadPendingAfterSaleCases();
       await loadPendingPayoutSettlements();
       await loadReconciliationReport();
+      await loadGrowthCampaigns();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -647,6 +682,69 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const createGrowthCampaign = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const payload = await apiRequest<{ campaignId: number; campaignStatus: string; couponCode: string }>(
+        '/api/v1/admin/growth/campaigns',
+        {
+          method: 'POST',
+          body: {
+            adminId: Number(adminId),
+            campaignName: growthCampaignName,
+            targetMemberLevel: growthTargetLevel,
+            couponCode: growthCouponCode,
+            startAt: growthStartAt,
+            endAt: growthEndAt
+          }
+        }
+      );
+      setPublishCampaignId(String(payload.campaignId));
+      await loadGrowthCampaigns();
+      setMessage(`增长活动创建成功，campaignId=${payload.campaignId}，状态=${payload.campaignStatus}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publishGrowthCampaign = async (): Promise<void> => {
+    if (!publishCampaignId) {
+      setMessage('请输入活动 ID');
+      return;
+    }
+    const userIds = publishUserIds
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    if (userIds.length === 0) {
+      setMessage('请输入至少一个有效用户 ID');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const payload = await apiRequest<{ touchedUsers: number; skippedByTierUsers: number; campaignStatus: string }>(
+        `/api/v1/admin/growth/campaigns/${Number(publishCampaignId)}/publish`,
+        {
+          method: 'POST',
+          body: {
+            adminId: Number(adminId),
+            userIds,
+            touchChannel: publishTouchChannel
+          }
+        }
+      );
+      await loadGrowthCampaigns();
+      setMessage(`活动触达完成：触达 ${payload.touchedUsers}，分层跳过 ${payload.skippedByTierUsers}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -878,6 +976,58 @@ function AdminApp(): JSX.Element {
         <button onClick={reconcileSettlementLedger} disabled={busy}>提交对账结果</button>
         <h3>对账报表</h3>
         <pre>{JSON.stringify(reconciliationReport, null, 2)}</pre>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 9 运营增长活动台</h2>
+        <div className="grid grid-2">
+          <label>
+            活动名称
+            <input value={growthCampaignName} onChange={(e) => setGrowthCampaignName(e.target.value)} />
+          </label>
+          <label>
+            目标会员层级
+            <select value={growthTargetLevel} onChange={(e) => setGrowthTargetLevel(e.target.value)}>
+              <option value="ALL">ALL</option>
+              <option value="BRONZE">BRONZE</option>
+              <option value="SILVER">SILVER</option>
+              <option value="GOLD">GOLD</option>
+            </select>
+          </label>
+          <label>
+            券码
+            <input value={growthCouponCode} onChange={(e) => setGrowthCouponCode(e.target.value)} />
+          </label>
+          <label>
+            开始时间（ISO）
+            <input value={growthStartAt} onChange={(e) => setGrowthStartAt(e.target.value)} />
+          </label>
+          <label>
+            结束时间（ISO）
+            <input value={growthEndAt} onChange={(e) => setGrowthEndAt(e.target.value)} />
+          </label>
+        </div>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <button onClick={createGrowthCampaign} disabled={busy}>创建增长活动</button>
+          <button onClick={loadGrowthCampaigns} disabled={busy}>刷新活动列表</button>
+        </div>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            触达活动 ID
+            <input value={publishCampaignId} onChange={(e) => setPublishCampaignId(e.target.value)} />
+          </label>
+          <label>
+            触达用户 ID（逗号分隔）
+            <input value={publishUserIds} onChange={(e) => setPublishUserIds(e.target.value)} />
+          </label>
+          <label>
+            触达渠道
+            <input value={publishTouchChannel} onChange={(e) => setPublishTouchChannel(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={publishGrowthCampaign} disabled={busy}>执行活动触达</button>
+        <pre>{JSON.stringify(growthCampaigns, null, 2)}</pre>
       </div>
 
       <div className="card grid grid-2">

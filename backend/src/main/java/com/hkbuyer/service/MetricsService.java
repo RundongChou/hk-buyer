@@ -16,6 +16,7 @@ public class MetricsService {
     private final FulfillmentService fulfillmentService;
     private final AfterSaleService afterSaleService;
     private final SettlementService settlementService;
+    private final GrowthService growthService;
 
     public MetricsService(OrderService orderService,
                           TaskService taskService,
@@ -23,7 +24,8 @@ public class MetricsService {
                           BuyerService buyerService,
                           FulfillmentService fulfillmentService,
                           AfterSaleService afterSaleService,
-                          SettlementService settlementService) {
+                          SettlementService settlementService,
+                          GrowthService growthService) {
         this.orderService = orderService;
         this.taskService = taskService;
         this.proofService = proofService;
@@ -31,6 +33,7 @@ public class MetricsService {
         this.fulfillmentService = fulfillmentService;
         this.afterSaleService = afterSaleService;
         this.settlementService = settlementService;
+        this.growthService = growthService;
     }
 
     public Map<String, Object> buildFunnelMetrics() {
@@ -174,5 +177,9 @@ public class MetricsService {
         payload.put("settlement_completion_rate", Double.valueOf(settlementCompletionRate));
         payload.put("settlement_reconciliation_accuracy_rate", Double.valueOf(settlementReconciliationAccuracyRate));
         return payload;
+    }
+
+    public Map<String, Object> buildGrowthMetrics() {
+        return growthService.buildGrowthMetrics();
     }
 }

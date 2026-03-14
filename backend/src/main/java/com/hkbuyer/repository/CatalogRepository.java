@@ -143,6 +143,28 @@ public class CatalogRepository {
         return queryCatalogSkus(conditions, new Object[]{CatalogPublishStatus.PUBLISHED.name()}, limit);
     }
 
+    public List<CatalogSku> listPublishedSkusByCategory(String categoryName, List<Long> excludeSkuIds, int limit) {
+        StringBuilder conditions = new StringBuilder();
+        List<Object> args = new ArrayList<Object>();
+        conditions.append(" AND s.publish_status = ? AND sp.category_name = ? AND COALESCE(st.available_qty, 0) > 0");
+        args.add(CatalogPublishStatus.PUBLISHED.name());
+        args.add(categoryName);
+
+        if (excludeSkuIds != null && !excludeSkuIds.isEmpty()) {
+            conditions.append(" AND s.sku_id NOT IN (");
+            for (int i = 0; i < excludeSkuIds.size(); i++) {
+                if (i > 0) {
+                    conditions.append(", ");
+                }
+                conditions.append("?");
+                args.add(excludeSkuIds.get(i));
+            }
+            conditions.append(")");
+        }
+
+        return queryCatalogSkus(conditions.toString(), args.toArray(), limit);
+    }
+
     public long countAllSkus() {
         String sql = "SELECT COUNT(1) FROM sku_item";
         Long count = jdbcTemplate.queryForObject(sql, Long.class);

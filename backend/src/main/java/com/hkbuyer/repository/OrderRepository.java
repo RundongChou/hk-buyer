@@ -27,8 +27,12 @@ public class OrderRepository {
     }
 
     public long createOrder(Long userId, BigDecimal totalAmount) {
-        String sql = "INSERT INTO order_main(user_id, order_status, pay_status, total_amount, created_at, updated_at) " +
-                "VALUES(?, ?, ?, ?, NOW(), NOW())";
+        return createOrder(userId, totalAmount, null, null);
+    }
+
+    public long createOrder(Long userId, BigDecimal totalAmount, String appliedCouponCode, Long appliedCampaignId) {
+        String sql = "INSERT INTO order_main(user_id, order_status, pay_status, total_amount, applied_coupon_code, applied_campaign_id, created_at, updated_at) " +
+                "VALUES(?, ?, ?, ?, ?, ?, NOW(), NOW())";
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
@@ -36,6 +40,12 @@ public class OrderRepository {
             ps.setString(2, OrderStatus.PENDING_PAYMENT.name());
             ps.setString(3, "UNPAID");
             ps.setBigDecimal(4, totalAmount);
+            ps.setString(5, appliedCouponCode);
+            if (appliedCampaignId == null) {
+                ps.setObject(6, null);
+            } else {
+                ps.setLong(6, appliedCampaignId.longValue());
+            }
             return ps;
         }, keyHolder);
         return keyHolder.getKey().longValue();
@@ -47,7 +57,8 @@ public class OrderRepository {
     }
 
     public Optional<OrderMain> findById(Long orderId) {
-        String sql = "SELECT order_id, user_id, order_status, pay_status, total_amount, created_at, updated_at FROM order_main WHERE order_id = ?";
+        String sql = "SELECT order_id, user_id, order_status, pay_status, total_amount, applied_coupon_code, applied_campaign_id, created_at, updated_at " +
+                "FROM order_main WHERE order_id = ?";
         List<OrderMain> result = jdbcTemplate.query(sql, orderMainRowMapper(), orderId);
         if (result.isEmpty()) {
             return Optional.empty();
@@ -93,6 +104,42 @@ public class OrderRepository {
         return result == null ? 0L : result.longValue();
     }
 
+    public long countPaidOrdersByUser(Long userId) {
+        String sql = "SELECT COUNT(1) FROM order_main WHERE user_id = ? AND pay_status = 'PAID'";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, userId);
+        return result == null ? 0L : result.longValue();
+    }
+
+    public BigDecimal sumPaidAmountByUser(Long userId) {
+        String sql = "SELECT COALESCE(SUM(total_amount), 0) FROM order_main WHERE user_id = ? AND pay_status = 'PAID'";
+        BigDecimal result = jdbcTemplate.queryForObject(sql, BigDecimal.class, userId);
+        return result == null ? BigDecimal.ZERO : result;
+    }
+
+    public long countPaidUsersWithinDays(int days) {
+        String sql = "SELECT COUNT(DISTINCT user_id) FROM order_main WHERE pay_status = 'PAID' " +
+                "AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, Integer.valueOf(days));
+        return result == null ? 0L : result.longValue();
+    }
+
+    public long countRepurchaseUsersWithinDays(int days) {
+        String sql = "SELECT COUNT(1) FROM (" +
+                "SELECT user_id FROM order_main WHERE pay_status = 'PAID' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) " +
+                "GROUP BY user_id HAVING COUNT(1) >= 2" +
+                ") t";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class, Integer.valueOf(days));
+        return result == null ? 0L : result.longValue();
+    }
+
+    public List<Long> listTopPurchasedSkuIdsByUser(Long userId, int limit) {
+        String sql = "SELECT oi.sku_id FROM order_item oi " +
+                "JOIN order_main om ON om.order_id = oi.order_id " +
+                "WHERE om.user_id = ? AND om.pay_status = 'PAID' " +
+                "GROUP BY oi.sku_id ORDER BY SUM(oi.qty) DESC, MAX(om.updated_at) DESC LIMIT ?";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> Long.valueOf(rs.getLong("sku_id")), userId, Integer.valueOf(limit));
+    }
+
     private RowMapper<OrderMain> orderMainRowMapper() {
         return (rs, rowNum) -> {
             OrderMain item = new OrderMain();
@@ -101,6 +148,11 @@ public class OrderRepository {
             item.setOrderStatus(OrderStatus.valueOf(rs.getString("order_status")));
             item.setPayStatus(rs.getString("pay_status"));
             item.setTotalAmount(rs.getBigDecimal("total_amount"));
+            item.setAppliedCouponCode(rs.getString("applied_coupon_code"));
+            long appliedCampaignId = rs.getLong("applied_campaign_id");
+            if (!rs.wasNull()) {
+                item.setAppliedCampaignId(Long.valueOf(appliedCampaignId));
+            }
             Timestamp createdAt = rs.getTimestamp("created_at");
             Timestamp updatedAt = rs.getTimestamp("updated_at");
             item.setCreatedAt(createdAt == null ? null : createdAt.toLocalDateTime());

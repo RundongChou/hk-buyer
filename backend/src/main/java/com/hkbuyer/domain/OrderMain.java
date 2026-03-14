@@ -9,6 +9,8 @@ public class OrderMain {
     private OrderStatus orderStatus;
     private String payStatus;
     private BigDecimal totalAmount;
+    private String appliedCouponCode;
+    private Long appliedCampaignId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -50,6 +52,22 @@ public class OrderMain {
 
     public void setTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
+    }
+
+    public String getAppliedCouponCode() {
+        return appliedCouponCode;
+    }
+
+    public void setAppliedCouponCode(String appliedCouponCode) {
+        this.appliedCouponCode = appliedCouponCode;
+    }
+
+    public Long getAppliedCampaignId() {
+        return appliedCampaignId;
+    }
+
+    public void setAppliedCampaignId(Long appliedCampaignId) {
+        this.appliedCampaignId = appliedCampaignId;
     }
 
     public LocalDateTime getCreatedAt() {
