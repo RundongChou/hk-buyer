@@ -1,6 +1,8 @@
 package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AuditProofRequest;
+import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
+import com.hkbuyer.service.BuyerService;
 import com.hkbuyer.service.MetricsService;
 import com.hkbuyer.service.ProofService;
 import org.springframework.validation.annotation.Validated;
@@ -22,10 +24,14 @@ public class AdminController {
 
     private final ProofService proofService;
     private final MetricsService metricsService;
+    private final BuyerService buyerService;
 
-    public AdminController(ProofService proofService, MetricsService metricsService) {
+    public AdminController(ProofService proofService,
+                           MetricsService metricsService,
+                           BuyerService buyerService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
+        this.buyerService = buyerService;
     }
 
     @GetMapping("/proofs/pending")
@@ -42,5 +48,26 @@ public class AdminController {
     @GetMapping("/metrics/funnel")
     public Map<String, Object> funnelMetrics() {
         return metricsService.buildFunnelMetrics();
+    }
+
+    @GetMapping("/buyer/onboarding/pending")
+    public List<Map<String, Object>> pendingBuyerOnboarding() {
+        return buyerService.listPendingOnboardingApplications();
+    }
+
+    @PostMapping("/buyer/onboarding/{applicationId}/audit")
+    public Map<String, Object> auditBuyerOnboarding(@PathVariable("applicationId") Long applicationId,
+                                                    @Valid @RequestBody AuditBuyerOnboardingRequest request) {
+        return buyerService.auditOnboardingApplication(
+                applicationId,
+                request.getAdminId(),
+                request.getDecision(),
+                request.getComment()
+        );
+    }
+
+    @GetMapping("/metrics/buyer-fulfillment")
+    public Map<String, Object> buyerFulfillmentMetrics() {
+        return metricsService.buildBuyerFulfillmentMetrics();
     }
 }

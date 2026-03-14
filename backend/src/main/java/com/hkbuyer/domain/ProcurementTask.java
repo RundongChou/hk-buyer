@@ -11,6 +11,11 @@ public class ProcurementTask {
     private LocalDateTime publishAt;
     private LocalDateTime acceptDeadline;
     private BigDecimal suggestedMarkup;
+    private TaskTier taskTier;
+    private BuyerLevel requiredBuyerLevel;
+    private String targetRegion;
+    private String targetCategory;
+    private Integer slaHours;
     private LocalDateTime acceptedAt;
     private LocalDateTime updatedAt;
 
@@ -68,6 +73,46 @@ public class ProcurementTask {
 
     public void setSuggestedMarkup(BigDecimal suggestedMarkup) {
         this.suggestedMarkup = suggestedMarkup;
+    }
+
+    public TaskTier getTaskTier() {
+        return taskTier;
+    }
+
+    public void setTaskTier(TaskTier taskTier) {
+        this.taskTier = taskTier;
+    }
+
+    public BuyerLevel getRequiredBuyerLevel() {
+        return requiredBuyerLevel;
+    }
+
+    public void setRequiredBuyerLevel(BuyerLevel requiredBuyerLevel) {
+        this.requiredBuyerLevel = requiredBuyerLevel;
+    }
+
+    public String getTargetRegion() {
+        return targetRegion;
+    }
+
+    public void setTargetRegion(String targetRegion) {
+        this.targetRegion = targetRegion;
+    }
+
+    public String getTargetCategory() {
+        return targetCategory;
+    }
+
+    public void setTargetCategory(String targetCategory) {
+        this.targetCategory = targetCategory;
+    }
+
+    public Integer getSlaHours() {
+        return slaHours;
+    }
+
+    public void setSlaHours(Integer slaHours) {
+        this.slaHours = slaHours;
     }
 
     public LocalDateTime getAcceptedAt() {

@@ -22,13 +22,16 @@ public class ProofService {
     private final ProofRepository proofRepository;
     private final TaskRepository taskRepository;
     private final OrderService orderService;
+    private final BuyerService buyerService;
 
     public ProofService(ProofRepository proofRepository,
                         TaskRepository taskRepository,
-                        OrderService orderService) {
+                        OrderService orderService,
+                        BuyerService buyerService) {
         this.proofRepository = proofRepository;
         this.taskRepository = taskRepository;
         this.orderService = orderService;
+        this.buyerService = buyerService;
     }
 
     public List<Map<String, Object>> listPendingProofs() {
@@ -84,6 +87,7 @@ public class ProofService {
 
         Long orderId = taskRepository.findOrderIdByTaskId(proof.getTaskId());
         orderService.updateOrderStatus(orderId, orderStatus, eventType, eventDescription);
+        buyerService.applyProofAuditResult(proof.getBuyerId(), auditStatus == ProofAuditStatus.APPROVED);
 
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("proofId", proofId);

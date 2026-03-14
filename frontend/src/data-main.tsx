@@ -17,22 +17,34 @@ interface CatalogMetrics {
   sku_out_of_stock: number;
 }
 
+interface BuyerFulfillmentMetrics {
+  buyer_pending_applications: number;
+  buyer_approved_total: number;
+  task_timeout_unaccepted_72h: number;
+  buyer_bronze_total: number;
+  buyer_silver_total: number;
+  buyer_gold_total: number;
+}
+
 function DataApp(): JSX.Element {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [catalogMetrics, setCatalogMetrics] = useState<CatalogMetrics | null>(null);
+  const [buyerMetrics, setBuyerMetrics] = useState<BuyerFulfillmentMetrics | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadMetrics = async (): Promise<void> => {
     setBusy(true);
     try {
-      const [funnelPayload, catalogPayload] = await Promise.all([
+      const [funnelPayload, catalogPayload, buyerPayload] = await Promise.all([
         apiRequest<FunnelMetrics>('/api/v1/admin/metrics/funnel'),
-        apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog')
+        apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog'),
+        apiRequest<BuyerFulfillmentMetrics>('/api/v1/admin/metrics/buyer-fulfillment')
       ]);
       setFunnelMetrics(funnelPayload);
       setCatalogMetrics(catalogPayload);
-      setMessage('漏斗与商品库存指标已刷新');
+      setBuyerMetrics(buyerPayload);
+      setMessage('漏斗、商品库存、买手履约指标已刷新');
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -83,6 +95,30 @@ function DataApp(): JSX.Element {
           <div className="badge">sku_out_of_stock</div>
           <h2>{catalogMetrics?.sku_out_of_stock ?? '-'}</h2>
         </div>
+        <div>
+          <div className="badge">buyer_pending_applications</div>
+          <h2>{buyerMetrics?.buyer_pending_applications ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">buyer_approved_total</div>
+          <h2>{buyerMetrics?.buyer_approved_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">task_timeout_unaccepted_72h</div>
+          <h2>{buyerMetrics?.task_timeout_unaccepted_72h ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">buyer_bronze_total</div>
+          <h2>{buyerMetrics?.buyer_bronze_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">buyer_silver_total</div>
+          <h2>{buyerMetrics?.buyer_silver_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">buyer_gold_total</div>
+          <h2>{buyerMetrics?.buyer_gold_total ?? '-'}</h2>
+        </div>
       </div>
       <div className="card">
         <strong>消息：</strong> {message}
@@ -94,6 +130,10 @@ function DataApp(): JSX.Element {
       <div className="card">
         <h2>商品库存指标</h2>
         <pre>{JSON.stringify(catalogMetrics, null, 2)}</pre>
+      </div>
+      <div className="card">
+        <h2>买手履约指标</h2>
+        <pre>{JSON.stringify(buyerMetrics, null, 2)}</pre>
       </div>
     </div>
   );

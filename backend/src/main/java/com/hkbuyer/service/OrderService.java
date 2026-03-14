@@ -4,10 +4,12 @@ import com.hkbuyer.api.ApiException;
 import com.hkbuyer.api.dto.CreateOrderItemRequest;
 import com.hkbuyer.api.dto.CreateOrderRequest;
 import com.hkbuyer.domain.CartItem;
+import com.hkbuyer.domain.BuyerLevel;
 import com.hkbuyer.domain.CouponTemplate;
 import com.hkbuyer.domain.OrderItem;
 import com.hkbuyer.domain.OrderMain;
 import com.hkbuyer.domain.OrderStatus;
+import com.hkbuyer.domain.TaskTier;
 import com.hkbuyer.domain.TimelineEvent;
 import com.hkbuyer.repository.CartRepository;
 import com.hkbuyer.repository.CouponRepository;
@@ -218,12 +220,22 @@ public class OrderService {
         orderRepository.markPaid(orderId);
         timelineRepository.addEvent(orderId, paymentEventType, paymentEventDescription + "，渠道: " + paymentChannel);
 
+        TaskDispatchPlan dispatchPlan = buildTaskDispatchPlan(orderId);
         long taskId = taskRepository.createTask(
                 orderId,
                 new BigDecimal("20.00"),
-                LocalDateTime.now().plusHours(72)
+                LocalDateTime.now().plusHours(dispatchPlan.getSlaHours().longValue()),
+                dispatchPlan.getTaskTier(),
+                dispatchPlan.getRequiredBuyerLevel(),
+                dispatchPlan.getTargetRegion(),
+                dispatchPlan.getTargetCategory(),
+                dispatchPlan.getSlaHours()
         );
-        timelineRepository.addEvent(orderId, "task_published", "采购任务已发布");
+        timelineRepository.addEvent(orderId,
+                "task_published",
+                "采购任务已发布，分层:" + dispatchPlan.getTaskTier().name()
+                        + "，最低买手等级:" + dispatchPlan.getRequiredBuyerLevel().name()
+                        + "，目标品类:" + dispatchPlan.getTargetCategory());
 
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("orderId", orderId);
@@ -232,6 +244,36 @@ public class OrderService {
         payload.put("payStatus", "PAID");
         payload.put("paymentChannel", paymentChannel);
         return payload;
+    }
+
+    private TaskDispatchPlan buildTaskDispatchPlan(Long orderId) {
+        OrderMain order = getOrderOrThrow(orderId);
+        BigDecimal totalAmount = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
+
+        TaskTier taskTier;
+        BuyerLevel requiredLevel;
+        int slaHours;
+        if (totalAmount.compareTo(new BigDecimal("500.00")) >= 0) {
+            taskTier = TaskTier.PRIORITY;
+            requiredLevel = BuyerLevel.GOLD;
+            slaHours = 24;
+        } else if (totalAmount.compareTo(new BigDecimal("200.00")) >= 0) {
+            taskTier = TaskTier.STANDARD;
+            requiredLevel = BuyerLevel.SILVER;
+            slaHours = 48;
+        } else {
+            taskTier = TaskTier.OPEN;
+            requiredLevel = BuyerLevel.BRONZE;
+            slaHours = 72;
+        }
+
+        String targetCategory = "GENERAL";
+        List<OrderItem> items = orderRepository.findItems(orderId);
+        if (!items.isEmpty()) {
+            targetCategory = catalogService.resolveTaskCategoryBySku(items.get(0).getSkuId());
+        }
+
+        return new TaskDispatchPlan(taskTier, requiredLevel, "HK", targetCategory, Integer.valueOf(slaHours));
     }
 
     private CheckoutQuote buildCartQuote(Long userId, String couponCode) {
@@ -402,6 +444,46 @@ public class OrderService {
 
         public Map<String, Object> getPayload() {
             return payload;
+        }
+    }
+
+    private static class TaskDispatchPlan {
+        private final TaskTier taskTier;
+        private final BuyerLevel requiredBuyerLevel;
+        private final String targetRegion;
+        private final String targetCategory;
+        private final Integer slaHours;
+
+        private TaskDispatchPlan(TaskTier taskTier,
+                                 BuyerLevel requiredBuyerLevel,
+                                 String targetRegion,
+                                 String targetCategory,
+                                 Integer slaHours) {
+            this.taskTier = taskTier;
+            this.requiredBuyerLevel = requiredBuyerLevel;
+            this.targetRegion = targetRegion;
+            this.targetCategory = targetCategory;
+            this.slaHours = slaHours;
+        }
+
+        public TaskTier getTaskTier() {
+            return taskTier;
+        }
+
+        public BuyerLevel getRequiredBuyerLevel() {
+            return requiredBuyerLevel;
+        }
+
+        public String getTargetRegion() {
+            return targetRegion;
+        }
+
+        public String getTargetCategory() {
+            return targetCategory;
+        }
+
+        public Integer getSlaHours() {
+            return slaHours;
         }
     }
 }

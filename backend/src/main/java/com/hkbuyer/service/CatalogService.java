@@ -208,6 +208,18 @@ public class CatalogService {
         }
     }
 
+    public String resolveTaskCategoryBySku(Long skuId) {
+        Optional<String> optionalCategory = catalogRepository.findCategoryBySkuId(skuId);
+        if (!optionalCategory.isPresent()) {
+            return "GENERAL";
+        }
+        String raw = optionalCategory.get();
+        if (raw == null || raw.trim().isEmpty()) {
+            return "GENERAL";
+        }
+        return raw.trim();
+    }
+
     private Map<String, Object> toSkuPayload(CatalogSku sku) {
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         boolean saleable = sku.getPublishStatus() == CatalogPublishStatus.PUBLISHED

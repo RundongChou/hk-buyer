@@ -51,6 +51,15 @@ public class CatalogRepository {
         return jdbcTemplate.queryForObject(sql, String.class, spuId);
     }
 
+    public Optional<String> findCategoryBySkuId(Long skuId) {
+        String sql = "SELECT sp.category_name FROM sku_item s JOIN sku_spu sp ON sp.spu_id = s.spu_id WHERE s.sku_id = ?";
+        List<String> rows = jdbcTemplate.query(sql, (rs, rowNum) -> rs.getString("category_name"), skuId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(rows.get(0));
+    }
+
     public long createSku(Long spuId, String skuName, String specValue, String brandName) {
         String sql = "INSERT INTO sku_item(spu_id, sku_name, spec_value, brand_name, publish_status, created_at, updated_at) " +
                 "VALUES(?, ?, ?, ?, ?, NOW(), NOW())";

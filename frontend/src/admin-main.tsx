@@ -26,12 +26,28 @@ interface CatalogSku {
   saleable: boolean;
 }
 
+interface BuyerOnboardingItem {
+  applicationId: number;
+  buyerId: number;
+  realName: string;
+  idCardSuffix: string;
+  serviceRegion: string;
+  specialtyCategory: string;
+  settlementAccount: string;
+  applicationStatus: string;
+  createdAt: string;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
+  const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
   const [proofId, setProofId] = useState('');
   const [adminId, setAdminId] = useState('70001');
   const [decision, setDecision] = useState('APPROVE');
   const [comment, setComment] = useState('符合采购凭证要求');
+  const [buyerApplicationId, setBuyerApplicationId] = useState('');
+  const [buyerDecision, setBuyerDecision] = useState('APPROVE');
+  const [buyerComment, setBuyerComment] = useState('资质通过，允许接单');
 
   const [spuName, setSpuName] = useState('港版维C精华');
   const [brandName, setBrandName] = useState('HK Beauty Lab');
@@ -95,12 +111,25 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadPendingBuyerApplications = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<BuyerOnboardingItem[]>('/api/v1/admin/buyer/onboarding/pending');
+      setBuyerApplications(payload);
+      if (!buyerApplicationId && payload.length > 0) {
+        setBuyerApplicationId(String(payload[0].applicationId));
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
       await loadProofs();
       await loadPendingSkus();
       await loadOutOfStockAlerts();
+      await loadPendingBuyerApplications();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -231,6 +260,30 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const auditBuyerApplication = async (): Promise<void> => {
+    if (!buyerApplicationId) {
+      setMessage('请输入入驻申请 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/admin/buyer/onboarding/${buyerApplicationId}/audit`, {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId),
+          decision: buyerDecision,
+          comment: buyerComment
+        }
+      });
+      setMessage('买手入驻审核完成');
+      await loadPendingBuyerApplications();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -261,6 +314,30 @@ function AdminApp(): JSX.Element {
           </label>
         </div>
         <button onClick={auditProof} disabled={busy}>提交凭证审核</button>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 4 买手入驻审核</h2>
+        <button onClick={loadPendingBuyerApplications} disabled={busy}>刷新待审核入驻申请</button>
+        <pre>{JSON.stringify(buyerApplications, null, 2)}</pre>
+        <div className="grid grid-2">
+          <label>
+            入驻申请 ID
+            <input value={buyerApplicationId} onChange={(e) => setBuyerApplicationId(e.target.value)} />
+          </label>
+          <label>
+            审核结果
+            <select value={buyerDecision} onChange={(e) => setBuyerDecision(e.target.value)}>
+              <option value="APPROVE">APPROVE</option>
+              <option value="REJECT">REJECT</option>
+            </select>
+          </label>
+          <label>
+            审核备注
+            <textarea value={buyerComment} onChange={(e) => setBuyerComment(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={auditBuyerApplication} disabled={busy}>提交买手审核</button>
       </div>
 
       <div className="card grid grid-2">
