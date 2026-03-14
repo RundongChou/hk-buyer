@@ -152,3 +152,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 6（交仓、质检、合规清关、物流轨迹回传）。
 - 下一 Sprint 验收标准：交仓 -> 入库 -> 清关 -> 国内运输 -> 签收链路可演示，且清关成功率与 7-15 天履约指标可观测。
 - 勘误/补充说明：严格遵守合规清关路径，未实现任何绕关/走私能力。
+
+## Sprint 6
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：6
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 6 PRD（2026-03-15）`（末尾补充版）
+- 分支：main
+- Commit：`b7dca44`（feat(sprint6): deliver warehouse customs logistics fulfillment loop）、`0d27835`（feat(sprint6): harden fulfillment handover gating and compliance metric）
+- Push 结果：已成功 push 到 `origin/main`（`c51a681..0d27835`）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已具备“交仓 -> 入仓质检 -> 合规清关 -> 国内物流 -> 签收”可演示闭环，并补强“先交仓后入仓扫描”约束与合规清关成功率护栏同名指标输出。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 5 动态加价与重派引擎（72h 超时识别、24h 频控、最多 3 次提价、自动重派/终止、指标回传）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 后端自动化测试在本机仍受 Java/Maven 环境缺失阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 6 仓配清关链路 V1，并补强履约中段流程一致性与护栏指标口径映射。
+- 本次实际完成：完成 Sprint 6 PRD；实现买手交仓、后台入仓质检、清关提交/审核、物流回传、履约详情查询；新增 `compliance_clearance_success_rate` 指标；入仓扫描改为必须依赖已交仓记录且校验 task/buyer 一致。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V6__sprint6_warehouse_customs_logistics.sql`（`warehouse_inbound`、`customs_clearance_record`、`shipment_tracking` 及索引）；本次补强提交无新增 MySQL 迁移。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`buyer-main.tsx` 新增交仓登记；`admin-main.tsx` 新增仓配清关控制台；`h5-main.tsx` 新增履约详情查询；`data-main.tsx` 新增 `compliance_clearance_success_rate` 展示。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `FulfillmentService/FulfillmentRepository` 与 `/api/v1/admin/fulfillment/*`、`/api/v1/orders/{orderId}/fulfillment`、`/api/v1/admin/metrics/fulfillment`；`scanInbound` 强制校验交仓前置与 task/buyer 一致；`MetricsService` 新增护栏同名指标字段输出。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：打通“凭证审核通过 -> 买手交仓 -> 入仓质检 -> 清关审核 -> 国内物流 -> 签收”履约中段闭环；保持合规清关路径，未实现任何绕关/走私能力。
+- 本次验证与测试结果：`cd frontend && npm run test` 通过（1 文件 / 3 用例）；`cd frontend && npm run typecheck` 通过；`cd frontend && npm run build` 通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）；`java -version` 失败（未安装 Java Runtime）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 6 对齐，履约中段可演示且指标可观测。
+- 架构师：前后端分离保持稳定，后端继续使用 Java8 + SpringMVC + JDBC + MySQL。
+- 测试：前端自动化通过；后端自动化受环境阻塞，需在 JDK8 + Maven 环境补跑。
+- 运营：可在后台执行入仓/清关/物流回传，并在数据平台查看清关成功率与签收时效。
+- 用户：可在 H5 查询履约详情与时间线，进度透明度提升。
+- 当前风险与技术债：本机缺少 JDK8/Maven；清关和物流状态仍依赖人工回传，尚未接入外部系统实时回调。
+- 下一 Sprint 建议目标：Roadmap Sprint 7（售后与风控闭环：缺货替代、部分退款、真伪争议、仲裁台）。
+- 下一 Sprint 验收标准：缺货替代与部分退款可执行、真伪争议有标准工单流转与仲裁结论、假货投诉率与订单取消率可观测。
+- 勘误/补充说明：此前 `TODO.md` 与 `Roadmap.md` 对 Sprint 6 记录存在滞后，本次已补齐 TODO 追加记录并保持历史 Sprint 不改写。
