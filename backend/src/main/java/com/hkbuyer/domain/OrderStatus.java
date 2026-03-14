@@ -6,6 +6,7 @@ public enum OrderStatus {
     BUYER_PROCUREMENT,
     PROOF_UNDER_REVIEW,
     WAIT_INBOUND,
+    CUSTOMS_CLEARANCE,
     IN_TRANSIT,
     SIGNED,
     CANCELLED

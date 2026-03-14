@@ -6,6 +6,10 @@ describe('toOrderStatusLabel', () => {
     expect(toOrderStatusLabel('PAID_WAIT_ACCEPT')).toBe('待接单');
   });
 
+  it('maps customs status to zh-cn label', () => {
+    expect(toOrderStatusLabel('CUSTOMS_CLEARANCE')).toBe('清关中');
+  });
+
   it('returns fallback for unknown status', () => {
     expect(toOrderStatusLabel('UNKNOWN')).toBe('UNKNOWN');
   });

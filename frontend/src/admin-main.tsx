@@ -63,6 +63,15 @@ interface TimeoutRepriceResult {
   details: Array<Record<string, unknown>>;
 }
 
+interface FulfillmentDetail {
+  orderId: number;
+  orderStatus: string;
+  warehouse: Record<string, unknown> | null;
+  customs: Record<string, unknown> | null;
+  shipment: Record<string, unknown> | null;
+  timeline: Array<Record<string, unknown>>;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -98,6 +107,22 @@ function AdminApp(): JSX.Element {
   const [outOfStockAlerts, setOutOfStockAlerts] = useState<CatalogSku[]>([]);
   const [timeoutCandidates, setTimeoutCandidates] = useState<TimeoutCandidateItem[]>([]);
   const [timeoutRepriceResult, setTimeoutRepriceResult] = useState<TimeoutRepriceResult | null>(null);
+  const [inboundTaskId, setInboundTaskId] = useState('');
+  const [inboundWarehouseCode, setInboundWarehouseCode] = useState('HK-WH-01');
+  const [qcDecision, setQcDecision] = useState('PASS');
+  const [qcNote, setQcNote] = useState('抽检通过');
+  const [customsOrderId, setCustomsOrderId] = useState('');
+  const [declarationNo, setDeclarationNo] = useState('DEC-20260315-001');
+  const [complianceChannel, setComplianceChannel] = useState('GENERAL_TRADE');
+  const [customsDecision, setCustomsDecision] = useState('APPROVE');
+  const [customsComment, setCustomsComment] = useState('资料完整，予以放行');
+  const [shipmentOrderId, setShipmentOrderId] = useState('');
+  const [shipmentCarrier, setShipmentCarrier] = useState('SF-EXPRESS');
+  const [shipmentTrackingNo, setShipmentTrackingNo] = useState('SF202603150001');
+  const [shipmentStatus, setShipmentStatus] = useState('IN_TRANSIT');
+  const [shipmentLatestNode, setShipmentLatestNode] = useState('深圳分拨中心已揽收');
+  const [fulfillmentOrderId, setFulfillmentOrderId] = useState('');
+  const [fulfillmentDetail, setFulfillmentDetail] = useState<FulfillmentDetail | null>(null);
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -337,6 +362,122 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const scanInbound = async (): Promise<void> => {
+    if (!inboundTaskId) {
+      setMessage('请输入任务 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = await apiRequest<{ orderId: number }>('/api/v1/admin/fulfillment/inbound/scan', {
+        method: 'POST',
+        body: {
+          taskId: Number(inboundTaskId),
+          warehouseCode: inboundWarehouseCode,
+          qcDecision,
+          qcNote
+        }
+      });
+      setCustomsOrderId(String(payload.orderId));
+      setShipmentOrderId(String(payload.orderId));
+      setFulfillmentOrderId(String(payload.orderId));
+      setMessage('入仓扫描与质检结果已提交');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCustoms = async (): Promise<void> => {
+    if (!customsOrderId) {
+      setMessage('请输入订单 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest('/api/v1/admin/fulfillment/customs/submit', {
+        method: 'POST',
+        body: {
+          orderId: Number(customsOrderId),
+          declarationNo,
+          complianceChannel
+        }
+      });
+      setMessage('清关资料提交成功');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reviewCustoms = async (): Promise<void> => {
+    if (!customsOrderId) {
+      setMessage('请输入订单 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest('/api/v1/admin/fulfillment/customs/review', {
+        method: 'POST',
+        body: {
+          orderId: Number(customsOrderId),
+          decision: customsDecision,
+          comment: customsComment
+        }
+      });
+      setMessage('清关审核结果已提交');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateShipment = async (): Promise<void> => {
+    if (!shipmentOrderId) {
+      setMessage('请输入订单 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest('/api/v1/admin/fulfillment/shipment/update', {
+        method: 'POST',
+        body: {
+          orderId: Number(shipmentOrderId),
+          carrier: shipmentCarrier,
+          trackingNo: shipmentTrackingNo,
+          shipmentStatus,
+          latestNode: shipmentLatestNode
+        }
+      });
+      setFulfillmentOrderId(shipmentOrderId);
+      setMessage('物流轨迹已回传');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadFulfillmentDetail = async (): Promise<void> => {
+    if (!fulfillmentOrderId) {
+      setMessage('请输入订单 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = await apiRequest<FulfillmentDetail>(`/api/v1/admin/fulfillment/orders/${Number(fulfillmentOrderId)}`);
+      setFulfillmentDetail(payload);
+      setMessage('履约详情已刷新');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -403,6 +544,98 @@ function AdminApp(): JSX.Element {
         <pre>{JSON.stringify(timeoutCandidates, null, 2)}</pre>
         <h3>最近执行结果</h3>
         <pre>{JSON.stringify(timeoutRepriceResult, null, 2)}</pre>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 6 仓配清关链路</h2>
+        <div className="grid grid-2">
+          <label>
+            入仓任务 ID
+            <input value={inboundTaskId} onChange={(e) => setInboundTaskId(e.target.value)} />
+          </label>
+          <label>
+            仓库编码
+            <input value={inboundWarehouseCode} onChange={(e) => setInboundWarehouseCode(e.target.value)} />
+          </label>
+          <label>
+            质检结果
+            <select value={qcDecision} onChange={(e) => setQcDecision(e.target.value)}>
+              <option value="PASS">PASS</option>
+              <option value="FAIL">FAIL</option>
+            </select>
+          </label>
+          <label>
+            质检备注
+            <textarea value={qcNote} onChange={(e) => setQcNote(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={scanInbound} disabled={busy}>提交入仓扫描</button>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            清关订单 ID
+            <input value={customsOrderId} onChange={(e) => setCustomsOrderId(e.target.value)} />
+          </label>
+          <label>
+            申报单号
+            <input value={declarationNo} onChange={(e) => setDeclarationNo(e.target.value)} />
+          </label>
+          <label>
+            合规渠道
+            <input value={complianceChannel} onChange={(e) => setComplianceChannel(e.target.value)} />
+          </label>
+          <label>
+            清关审核
+            <select value={customsDecision} onChange={(e) => setCustomsDecision(e.target.value)}>
+              <option value="APPROVE">APPROVE</option>
+              <option value="REJECT">REJECT</option>
+            </select>
+          </label>
+          <label>
+            清关备注
+            <textarea value={customsComment} onChange={(e) => setCustomsComment(e.target.value)} />
+          </label>
+        </div>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <button onClick={submitCustoms} disabled={busy}>提交清关资料</button>
+          <button onClick={reviewCustoms} disabled={busy}>提交清关审核</button>
+        </div>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            物流订单 ID
+            <input value={shipmentOrderId} onChange={(e) => setShipmentOrderId(e.target.value)} />
+          </label>
+          <label>
+            承运商
+            <input value={shipmentCarrier} onChange={(e) => setShipmentCarrier(e.target.value)} />
+          </label>
+          <label>
+            运单号
+            <input value={shipmentTrackingNo} onChange={(e) => setShipmentTrackingNo(e.target.value)} />
+          </label>
+          <label>
+            物流状态
+            <select value={shipmentStatus} onChange={(e) => setShipmentStatus(e.target.value)}>
+              <option value="IN_TRANSIT">IN_TRANSIT</option>
+              <option value="SIGNED">SIGNED</option>
+            </select>
+          </label>
+          <label>
+            最新节点
+            <textarea value={shipmentLatestNode} onChange={(e) => setShipmentLatestNode(e.target.value)} />
+          </label>
+        </div>
+        <button onClick={updateShipment} disabled={busy}>回传物流状态</button>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            履约查询订单 ID
+            <input value={fulfillmentOrderId} onChange={(e) => setFulfillmentOrderId(e.target.value)} />
+          </label>
+          <button onClick={loadFulfillmentDetail} disabled={busy}>查询履约详情</button>
+        </div>
+        <pre>{JSON.stringify(fulfillmentDetail, null, 2)}</pre>
       </div>
 
       <div className="card grid grid-2">

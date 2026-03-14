@@ -1,7 +1,9 @@
 package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AcceptTaskRequest;
+import com.hkbuyer.api.dto.SubmitTaskHandoverRequest;
 import com.hkbuyer.api.dto.SubmitProofRequest;
+import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.TaskService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,9 +24,12 @@ import java.util.Map;
 public class BuyerTaskController {
 
     private final TaskService taskService;
+    private final FulfillmentService fulfillmentService;
 
-    public BuyerTaskController(TaskService taskService) {
+    public BuyerTaskController(TaskService taskService,
+                               FulfillmentService fulfillmentService) {
         this.taskService = taskService;
+        this.fulfillmentService = fulfillmentService;
     }
 
     @GetMapping
@@ -42,5 +47,11 @@ public class BuyerTaskController {
     public Map<String, Object> submitProof(@PathVariable("taskId") Long taskId,
                                            @Valid @RequestBody SubmitProofRequest request) {
         return taskService.submitProof(taskId, request);
+    }
+
+    @PostMapping("/{taskId}/handover")
+    public Map<String, Object> submitHandover(@PathVariable("taskId") Long taskId,
+                                              @Valid @RequestBody SubmitTaskHandoverRequest request) {
+        return fulfillmentService.submitHandover(taskId, request.getBuyerId(), request.getWarehouseCode());
     }
 }

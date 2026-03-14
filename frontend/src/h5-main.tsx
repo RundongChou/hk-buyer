@@ -65,6 +65,15 @@ interface PayOrderResponse {
   failureReason?: string;
 }
 
+interface FulfillmentDetail {
+  orderId: number;
+  orderStatus: string;
+  warehouse: Record<string, unknown> | null;
+  customs: Record<string, unknown> | null;
+  shipment: Record<string, unknown> | null;
+  timeline: TimelineEvent[];
+}
+
 function H5App(): JSX.Element {
   const [userId, setUserId] = useState('10001');
   const [qty, setQty] = useState('1');
@@ -78,6 +87,7 @@ function H5App(): JSX.Element {
   const [compensationToken, setCompensationToken] = useState('');
   const [orderDetail, setOrderDetail] = useState<unknown>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [fulfillmentDetail, setFulfillmentDetail] = useState<FulfillmentDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -278,6 +288,24 @@ function H5App(): JSX.Element {
     }
   };
 
+  const loadFulfillment = async (): Promise<void> => {
+    if (!orderId) {
+      setMessage('请先输入订单号');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const payload = await apiRequest<FulfillmentDetail>(`/api/v1/orders/${orderId}/fulfillment`);
+      setFulfillmentDetail(payload);
+      setMessage('履约详情已刷新');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>H5 用户端（交易稳态 V2）</h1>
@@ -370,7 +398,10 @@ function H5App(): JSX.Element {
       </div>
 
       <div className="card">
-        <button onClick={loadOrder} disabled={busy}>刷新订单与时间线</button>
+        <div className="grid grid-2">
+          <button onClick={loadOrder} disabled={busy}>刷新订单与时间线</button>
+          <button onClick={loadFulfillment} disabled={busy}>刷新履约详情</button>
+        </div>
       </div>
 
       {message ? (
@@ -387,6 +418,11 @@ function H5App(): JSX.Element {
       <div className="card">
         <h2>订单时间线</h2>
         <pre>{JSON.stringify(timeline, null, 2)}</pre>
+      </div>
+
+      <div className="card">
+        <h2>仓配清关履约详情</h2>
+        <pre>{JSON.stringify(fulfillmentDetail, null, 2)}</pre>
       </div>
     </div>
   );

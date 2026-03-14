@@ -53,6 +53,7 @@ function BuyerApp(): JSX.Element {
   const [batchNo, setBatchNo] = useState('BATCH-20260314');
   const [expiryDate, setExpiryDate] = useState('2027-03-14');
   const [productPhotoUrl, setProductPhotoUrl] = useState('https://example.com/product.jpg');
+  const [warehouseCode, setWarehouseCode] = useState('HK-WH-01');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -161,6 +162,28 @@ function BuyerApp(): JSX.Element {
     }
   };
 
+  const submitHandover = async (): Promise<void> => {
+    if (!taskId) {
+      setMessage('请输入任务 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/buyer/tasks/${taskId}/handover`, {
+        method: 'POST',
+        body: {
+          buyerId: Number(buyerId),
+          warehouseCode
+        }
+      });
+      setMessage('交仓登记成功，等待仓库入仓扫描');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>买手端</h1>
@@ -239,6 +262,17 @@ function BuyerApp(): JSX.Element {
 
       <div className="card">
         <button onClick={submitProof} disabled={busy}>提交凭证</button>
+      </div>
+
+      <div className="card grid grid-2">
+        <label>
+          仓库编码
+          <input value={warehouseCode} onChange={(e) => setWarehouseCode(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="card">
+        <button onClick={submitHandover} disabled={busy}>提交交仓登记</button>
       </div>
 
       <div className="card">

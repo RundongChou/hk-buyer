@@ -37,28 +37,43 @@ interface DynamicPricingMetrics {
   repriced_task_accept_rate: number;
 }
 
+interface FulfillmentMetrics {
+  warehouse_inbound_completed_total: number;
+  customs_submitted_total: number;
+  customs_released_total: number;
+  customs_rejected_total: number;
+  customs_success_rate: number;
+  shipment_in_transit_total: number;
+  shipment_signed_total: number;
+  signed_within_7_15_days_total: number;
+  signed_within_7_15_days_rate: number;
+}
+
 function DataApp(): JSX.Element {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [catalogMetrics, setCatalogMetrics] = useState<CatalogMetrics | null>(null);
   const [buyerMetrics, setBuyerMetrics] = useState<BuyerFulfillmentMetrics | null>(null);
   const [dynamicMetrics, setDynamicMetrics] = useState<DynamicPricingMetrics | null>(null);
+  const [fulfillmentMetrics, setFulfillmentMetrics] = useState<FulfillmentMetrics | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadMetrics = async (): Promise<void> => {
     setBusy(true);
     try {
-      const [funnelPayload, catalogPayload, buyerPayload, dynamicPayload] = await Promise.all([
+      const [funnelPayload, catalogPayload, buyerPayload, dynamicPayload, fulfillmentPayload] = await Promise.all([
         apiRequest<FunnelMetrics>('/api/v1/admin/metrics/funnel'),
         apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog'),
         apiRequest<BuyerFulfillmentMetrics>('/api/v1/admin/metrics/buyer-fulfillment'),
-        apiRequest<DynamicPricingMetrics>('/api/v1/admin/metrics/dynamic-pricing')
+        apiRequest<DynamicPricingMetrics>('/api/v1/admin/metrics/dynamic-pricing'),
+        apiRequest<FulfillmentMetrics>('/api/v1/admin/metrics/fulfillment')
       ]);
       setFunnelMetrics(funnelPayload);
       setCatalogMetrics(catalogPayload);
       setBuyerMetrics(buyerPayload);
       setDynamicMetrics(dynamicPayload);
-      setMessage('漏斗、商品库存、买手履约、动态提价指标已刷新');
+      setFulfillmentMetrics(fulfillmentPayload);
+      setMessage('漏斗、商品库存、买手履约、动态提价、仓配清关指标已刷新');
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -153,6 +168,38 @@ function DataApp(): JSX.Element {
           <div className="badge">repriced_task_accept_rate</div>
           <h2>{dynamicMetrics?.repriced_task_accept_rate ?? '-'}</h2>
         </div>
+        <div>
+          <div className="badge">warehouse_inbound_completed_total</div>
+          <h2>{fulfillmentMetrics?.warehouse_inbound_completed_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">customs_submitted_total</div>
+          <h2>{fulfillmentMetrics?.customs_submitted_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">customs_released_total</div>
+          <h2>{fulfillmentMetrics?.customs_released_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">customs_success_rate</div>
+          <h2>{fulfillmentMetrics?.customs_success_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">shipment_in_transit_total</div>
+          <h2>{fulfillmentMetrics?.shipment_in_transit_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">shipment_signed_total</div>
+          <h2>{fulfillmentMetrics?.shipment_signed_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">signed_within_7_15_days_total</div>
+          <h2>{fulfillmentMetrics?.signed_within_7_15_days_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">signed_within_7_15_days_rate</div>
+          <h2>{fulfillmentMetrics?.signed_within_7_15_days_rate ?? '-'}</h2>
+        </div>
       </div>
       <div className="card">
         <strong>消息：</strong> {message}
@@ -172,6 +219,10 @@ function DataApp(): JSX.Element {
       <div className="card">
         <h2>动态提价与重派指标</h2>
         <pre>{JSON.stringify(dynamicMetrics, null, 2)}</pre>
+      </div>
+      <div className="card">
+        <h2>仓配清关链路指标</h2>
+        <pre>{JSON.stringify(fulfillmentMetrics, null, 2)}</pre>
       </div>
     </div>
   );

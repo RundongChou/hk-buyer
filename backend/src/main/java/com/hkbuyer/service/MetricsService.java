@@ -13,15 +13,18 @@ public class MetricsService {
     private final TaskService taskService;
     private final ProofService proofService;
     private final BuyerService buyerService;
+    private final FulfillmentService fulfillmentService;
 
     public MetricsService(OrderService orderService,
                           TaskService taskService,
                           ProofService proofService,
-                          BuyerService buyerService) {
+                          BuyerService buyerService,
+                          FulfillmentService fulfillmentService) {
         this.orderService = orderService;
         this.taskService = taskService;
         this.proofService = proofService;
         this.buyerService = buyerService;
+        this.fulfillmentService = fulfillmentService;
     }
 
     public Map<String, Object> buildFunnelMetrics() {
@@ -68,6 +71,38 @@ public class MetricsService {
         payload.put("task_timeout_terminated_total", Long.valueOf(terminatedTotal));
         payload.put("repriced_task_accepted_total", Long.valueOf(acceptedAfterMarkup));
         payload.put("repriced_task_accept_rate", Double.valueOf(acceptedRate));
+        return payload;
+    }
+
+    public Map<String, Object> buildFulfillmentMetrics() {
+        long inboundCompleted = fulfillmentService.countInboundCompleted();
+        long customsSubmitted = fulfillmentService.countCustomsSubmitted();
+        long customsReleased = fulfillmentService.countCustomsReleased();
+        long customsRejected = fulfillmentService.countCustomsRejected();
+        long shipmentInTransit = fulfillmentService.countShipmentInTransit();
+        long shipmentSigned = fulfillmentService.countShipmentSigned();
+        long signedWithinSevenToFifteenDays = fulfillmentService.countSignedWithinSevenToFifteenDays();
+
+        double customsSuccessRate = 0D;
+        if (customsSubmitted > 0L) {
+            customsSuccessRate = (customsReleased * 1.0D) / customsSubmitted;
+        }
+
+        double signedWithinTargetRate = 0D;
+        if (shipmentSigned > 0L) {
+            signedWithinTargetRate = (signedWithinSevenToFifteenDays * 1.0D) / shipmentSigned;
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("warehouse_inbound_completed_total", Long.valueOf(inboundCompleted));
+        payload.put("customs_submitted_total", Long.valueOf(customsSubmitted));
+        payload.put("customs_released_total", Long.valueOf(customsReleased));
+        payload.put("customs_rejected_total", Long.valueOf(customsRejected));
+        payload.put("customs_success_rate", Double.valueOf(customsSuccessRate));
+        payload.put("shipment_in_transit_total", Long.valueOf(shipmentInTransit));
+        payload.put("shipment_signed_total", Long.valueOf(shipmentSigned));
+        payload.put("signed_within_7_15_days_total", Long.valueOf(signedWithinSevenToFifteenDays));
+        payload.put("signed_within_7_15_days_rate", Double.valueOf(signedWithinTargetRate));
         return payload;
     }
 }

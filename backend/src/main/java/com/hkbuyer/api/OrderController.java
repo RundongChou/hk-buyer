@@ -3,6 +3,7 @@ package com.hkbuyer.api;
 import com.hkbuyer.api.dto.CreateOrderRequest;
 import com.hkbuyer.api.dto.CompensatePayRequest;
 import com.hkbuyer.api.dto.PayOrderRequest;
+import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.OrderService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +22,12 @@ import java.util.Map;
 public class OrderController {
 
     private final OrderService orderService;
+    private final FulfillmentService fulfillmentService;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService,
+                           FulfillmentService fulfillmentService) {
         this.orderService = orderService;
+        this.fulfillmentService = fulfillmentService;
     }
 
     @PostMapping
@@ -51,5 +55,10 @@ public class OrderController {
     @GetMapping("/{orderId}/timeline")
     public Object orderTimeline(@PathVariable("orderId") Long orderId) {
         return orderService.getTimeline(orderId);
+    }
+
+    @GetMapping("/{orderId}/fulfillment")
+    public Map<String, Object> orderFulfillment(@PathVariable("orderId") Long orderId) {
+        return fulfillmentService.getOrderFulfillment(orderId);
     }
 }

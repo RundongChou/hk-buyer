@@ -2,7 +2,12 @@ package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AuditProofRequest;
 import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
+import com.hkbuyer.api.dto.InboundScanRequest;
+import com.hkbuyer.api.dto.ReviewCustomsRequest;
+import com.hkbuyer.api.dto.SubmitCustomsRequest;
+import com.hkbuyer.api.dto.UpdateShipmentRequest;
 import com.hkbuyer.service.BuyerService;
+import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.MetricsService;
 import com.hkbuyer.service.ProofService;
 import com.hkbuyer.service.TaskService;
@@ -27,15 +32,18 @@ public class AdminController {
     private final MetricsService metricsService;
     private final BuyerService buyerService;
     private final TaskService taskService;
+    private final FulfillmentService fulfillmentService;
 
     public AdminController(ProofService proofService,
                            MetricsService metricsService,
                            BuyerService buyerService,
-                           TaskService taskService) {
+                           TaskService taskService,
+                           FulfillmentService fulfillmentService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
         this.buyerService = buyerService;
         this.taskService = taskService;
+        this.fulfillmentService = fulfillmentService;
     }
 
     @GetMapping("/proofs/pending")
@@ -88,5 +96,54 @@ public class AdminController {
     @GetMapping("/metrics/dynamic-pricing")
     public Map<String, Object> dynamicPricingMetrics() {
         return metricsService.buildDynamicPricingMetrics();
+    }
+
+    @PostMapping("/fulfillment/inbound/scan")
+    public Map<String, Object> scanInbound(@Valid @RequestBody InboundScanRequest request) {
+        return fulfillmentService.scanInbound(
+                request.getTaskId(),
+                request.getWarehouseCode(),
+                request.getQcDecision(),
+                request.getQcNote()
+        );
+    }
+
+    @PostMapping("/fulfillment/customs/submit")
+    public Map<String, Object> submitCustoms(@Valid @RequestBody SubmitCustomsRequest request) {
+        return fulfillmentService.submitCustoms(
+                request.getOrderId(),
+                request.getDeclarationNo(),
+                request.getComplianceChannel()
+        );
+    }
+
+    @PostMapping("/fulfillment/customs/review")
+    public Map<String, Object> reviewCustoms(@Valid @RequestBody ReviewCustomsRequest request) {
+        return fulfillmentService.reviewCustoms(
+                request.getOrderId(),
+                request.getDecision(),
+                request.getComment()
+        );
+    }
+
+    @PostMapping("/fulfillment/shipment/update")
+    public Map<String, Object> updateShipment(@Valid @RequestBody UpdateShipmentRequest request) {
+        return fulfillmentService.updateShipment(
+                request.getOrderId(),
+                request.getCarrier(),
+                request.getTrackingNo(),
+                request.getShipmentStatus(),
+                request.getLatestNode()
+        );
+    }
+
+    @GetMapping("/fulfillment/orders/{orderId}")
+    public Map<String, Object> fulfillmentDetail(@PathVariable("orderId") Long orderId) {
+        return fulfillmentService.getOrderFulfillment(orderId);
+    }
+
+    @GetMapping("/metrics/fulfillment")
+    public Map<String, Object> fulfillmentMetrics() {
+        return metricsService.buildFulfillmentMetrics();
     }
 }
