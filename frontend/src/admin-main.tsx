@@ -132,6 +132,58 @@ interface GrowthCampaignItem {
   updatedAt: string;
 }
 
+interface OpsExperimentItem {
+  experimentId: number;
+  experimentKey: string;
+  experimentName: string;
+  experimentStatus: string;
+  controlRatio: string;
+  treatmentRatio: string;
+  treatmentMarkupDelta: string;
+  treatmentSlaHours: number;
+  createdBy: number;
+  activatedBy: number | null;
+  activatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  hasActiveExperiment?: boolean;
+}
+
+interface OpsAssignmentItem {
+  assignmentId: number;
+  experimentId: number;
+  orderId: number;
+  userId: number;
+  variant: string;
+  baseSlaHours: number;
+  finalSlaHours: number;
+  baseMarkup: string;
+  finalMarkup: string;
+  assignedAt: string;
+}
+
+interface OpsAlertItem {
+  alertId: number;
+  alertType: string;
+  metricKey: string;
+  metricValue: string;
+  thresholdValue: string;
+  severity: string;
+  alertStatus: string;
+  detail: string;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+interface OpsAlertEvaluationResult {
+  evaluatedAt: string;
+  createdAlerts: number;
+  resolvedAlerts: number;
+  openAlertTotal: number;
+  openHighAlertTotal: number;
+  guardrailSnapshot: Record<string, unknown>;
+}
+
 function AdminApp(): JSX.Element {
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [buyerApplications, setBuyerApplications] = useState<BuyerOnboardingItem[]>([]);
@@ -203,6 +255,17 @@ function AdminApp(): JSX.Element {
   const [publishCampaignId, setPublishCampaignId] = useState('');
   const [publishUserIds, setPublishUserIds] = useState('10001,10002,10003');
   const [publishTouchChannel, setPublishTouchChannel] = useState('IN_APP');
+  const [opsExperimentKey, setOpsExperimentKey] = useState('dispatch_sla_cost_v1');
+  const [opsExperimentName, setOpsExperimentName] = useState('Sprint10 派单时效成本实验');
+  const [opsControlRatio, setOpsControlRatio] = useState('0.5000');
+  const [opsTreatmentRatio, setOpsTreatmentRatio] = useState('0.5000');
+  const [opsTreatmentMarkupDelta, setOpsTreatmentMarkupDelta] = useState('-5.00');
+  const [opsTreatmentSlaHours, setOpsTreatmentSlaHours] = useState('48');
+  const [opsExperimentId, setOpsExperimentId] = useState('');
+  const [activeOpsExperiment, setActiveOpsExperiment] = useState<OpsExperimentItem | null>(null);
+  const [opsAssignments, setOpsAssignments] = useState<OpsAssignmentItem[]>([]);
+  const [openOpsAlerts, setOpenOpsAlerts] = useState<OpsAlertItem[]>([]);
+  const [opsAlertEvaluation, setOpsAlertEvaluation] = useState<OpsAlertEvaluationResult | null>(null);
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -309,6 +372,44 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const loadActiveOpsExperiment = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<OpsExperimentItem>('/api/v1/admin/ops/experiments/active');
+      if (payload.hasActiveExperiment === false) {
+        setActiveOpsExperiment(null);
+        return;
+      }
+      setActiveOpsExperiment(payload);
+      setOpsExperimentId(String(payload.experimentId));
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
+  const loadOpsAssignments = async (): Promise<void> => {
+    if (!opsExperimentId) {
+      setMessage('请输入实验 ID');
+      return;
+    }
+    try {
+      const payload = await apiRequest<OpsAssignmentItem[]>(
+        `/api/v1/admin/ops/experiments/${Number(opsExperimentId)}/assignments`
+      );
+      setOpsAssignments(payload);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
+  const loadOpenOpsAlerts = async (): Promise<void> => {
+    try {
+      const payload = await apiRequest<OpsAlertItem[]>('/api/v1/admin/ops/alerts/open');
+      setOpenOpsAlerts(payload);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setBusy(true);
@@ -321,6 +422,8 @@ function AdminApp(): JSX.Element {
       await loadPendingPayoutSettlements();
       await loadReconciliationReport();
       await loadGrowthCampaigns();
+      await loadActiveOpsExperiment();
+      await loadOpenOpsAlerts();
       setBusy(false);
       setMessage('管理数据已初始化');
     })();
@@ -745,6 +848,68 @@ function AdminApp(): JSX.Element {
     }
   };
 
+  const createOpsExperiment = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const payload = await apiRequest<OpsExperimentItem>('/api/v1/admin/ops/experiments', {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId),
+          experimentKey: opsExperimentKey,
+          experimentName: opsExperimentName,
+          controlRatio: Number(opsControlRatio),
+          treatmentRatio: Number(opsTreatmentRatio),
+          treatmentMarkupDelta: Number(opsTreatmentMarkupDelta),
+          treatmentSlaHours: Number(opsTreatmentSlaHours)
+        }
+      });
+      setOpsExperimentId(String(payload.experimentId));
+      setMessage(`实验创建成功，experimentId=${payload.experimentId}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const activateOpsExperiment = async (): Promise<void> => {
+    if (!opsExperimentId) {
+      setMessage('请输入实验 ID');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/api/v1/admin/ops/experiments/${Number(opsExperimentId)}/activate`, {
+        method: 'POST',
+        body: {
+          adminId: Number(adminId)
+        }
+      });
+      await loadActiveOpsExperiment();
+      setMessage('实验已激活');
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const evaluateOpsAlerts = async (): Promise<void> => {
+    setBusy(true);
+    try {
+      const payload = await apiRequest<OpsAlertEvaluationResult>('/api/v1/admin/ops/alerts/evaluate', {
+        method: 'POST'
+      });
+      setOpsAlertEvaluation(payload);
+      await loadOpenOpsAlerts();
+      setMessage(`告警评估完成：新增 ${payload.createdAlerts}，恢复 ${payload.resolvedAlerts}`);
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container">
       <h1>管理后台</h1>
@@ -1028,6 +1193,65 @@ function AdminApp(): JSX.Element {
         </div>
         <button onClick={publishGrowthCampaign} disabled={busy}>执行活动触达</button>
         <pre>{JSON.stringify(growthCampaigns, null, 2)}</pre>
+      </div>
+
+      <div className="card">
+        <h2>Sprint 10 稳态运营与优化台</h2>
+        <div className="grid grid-2">
+          <label>
+            实验 Key
+            <input value={opsExperimentKey} onChange={(e) => setOpsExperimentKey(e.target.value)} />
+          </label>
+          <label>
+            实验名称
+            <input value={opsExperimentName} onChange={(e) => setOpsExperimentName(e.target.value)} />
+          </label>
+          <label>
+            Control 流量占比
+            <input value={opsControlRatio} onChange={(e) => setOpsControlRatio(e.target.value)} />
+          </label>
+          <label>
+            Treatment 流量占比
+            <input value={opsTreatmentRatio} onChange={(e) => setOpsTreatmentRatio(e.target.value)} />
+          </label>
+          <label>
+            Treatment 加价调整
+            <input value={opsTreatmentMarkupDelta} onChange={(e) => setOpsTreatmentMarkupDelta(e.target.value)} />
+          </label>
+          <label>
+            Treatment 目标SLA(h)
+            <input value={opsTreatmentSlaHours} onChange={(e) => setOpsTreatmentSlaHours(e.target.value)} />
+          </label>
+        </div>
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <button onClick={createOpsExperiment} disabled={busy}>创建实验</button>
+          <button onClick={loadActiveOpsExperiment} disabled={busy}>刷新激活实验</button>
+        </div>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <label>
+            实验 ID
+            <input value={opsExperimentId} onChange={(e) => setOpsExperimentId(e.target.value)} />
+          </label>
+          <div className="grid grid-2">
+            <button onClick={activateOpsExperiment} disabled={busy}>激活实验</button>
+            <button onClick={loadOpsAssignments} disabled={busy}>查询分流记录</button>
+          </div>
+        </div>
+
+        <div className="grid grid-2" style={{ marginTop: 12 }}>
+          <button onClick={evaluateOpsAlerts} disabled={busy}>执行护栏告警评估</button>
+          <button onClick={loadOpenOpsAlerts} disabled={busy}>刷新 OPEN 告警</button>
+        </div>
+
+        <h3>当前激活实验</h3>
+        <pre>{JSON.stringify(activeOpsExperiment, null, 2)}</pre>
+        <h3>实验分流记录</h3>
+        <pre>{JSON.stringify(opsAssignments, null, 2)}</pre>
+        <h3>告警评估结果</h3>
+        <pre>{JSON.stringify(opsAlertEvaluation, null, 2)}</pre>
+        <h3>OPEN 告警</h3>
+        <pre>{JSON.stringify(openOpsAlerts, null, 2)}</pre>
       </div>
 
       <div className="card grid grid-2">

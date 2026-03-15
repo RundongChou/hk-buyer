@@ -45,6 +45,7 @@ public class OrderService {
     private final CouponRepository couponRepository;
     private final PaymentCompensationRepository paymentCompensationRepository;
     private final GrowthService growthService;
+    private final OptimizationService optimizationService;
 
     public OrderService(OrderRepository orderRepository,
                         TaskRepository taskRepository,
@@ -53,7 +54,8 @@ public class OrderService {
                         CartRepository cartRepository,
                         CouponRepository couponRepository,
                         PaymentCompensationRepository paymentCompensationRepository,
-                        GrowthService growthService) {
+                        GrowthService growthService,
+                        OptimizationService optimizationService) {
         this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
         this.timelineRepository = timelineRepository;
@@ -62,6 +64,7 @@ public class OrderService {
         this.couponRepository = couponRepository;
         this.paymentCompensationRepository = paymentCompensationRepository;
         this.growthService = growthService;
+        this.optimizationService = optimizationService;
     }
 
     @Transactional
@@ -236,25 +239,53 @@ public class OrderService {
                                                        String paymentChannel,
                                                        String paymentEventType,
                                                        String paymentEventDescription) {
+        OrderMain order = getOrderOrThrow(orderId);
         orderRepository.markPaid(orderId);
         timelineRepository.addEvent(orderId, paymentEventType, paymentEventDescription + "，渠道: " + paymentChannel);
 
         TaskDispatchPlan dispatchPlan = buildTaskDispatchPlan(orderId);
+        OptimizationService.DispatchOptimizationDecision optimizationDecision = optimizationService.optimizeDispatch(
+                orderId,
+                order.getUserId(),
+                new BigDecimal("20.00"),
+                dispatchPlan.getSlaHours()
+        );
+
+        BigDecimal finalSuggestedMarkup = optimizationDecision.getFinalMarkup();
+        int finalSlaHours = optimizationDecision.getFinalSlaHours().intValue();
         long taskId = taskRepository.createTask(
                 orderId,
-                new BigDecimal("20.00"),
-                LocalDateTime.now().plusHours(72),
+                finalSuggestedMarkup,
+                LocalDateTime.now().plusHours(finalSlaHours),
                 dispatchPlan.getTaskTier(),
                 dispatchPlan.getRequiredBuyerLevel(),
                 dispatchPlan.getTargetRegion(),
                 dispatchPlan.getTargetCategory(),
-                dispatchPlan.getSlaHours()
+                Integer.valueOf(finalSlaHours)
         );
+
+        StringBuilder dispatchDescription = new StringBuilder();
+        dispatchDescription.append("采购任务已发布，分层:")
+                .append(dispatchPlan.getTaskTier().name())
+                .append("，最低买手等级:")
+                .append(dispatchPlan.getRequiredBuyerLevel().name())
+                .append("，目标品类:")
+                .append(dispatchPlan.getTargetCategory())
+                .append("，建议加价:")
+                .append(finalSuggestedMarkup.toPlainString())
+                .append("，接单SLA:")
+                .append(finalSlaHours)
+                .append("h");
+        if (optimizationDecision.hasExperiment()) {
+            dispatchDescription.append("，实验:")
+                    .append(optimizationDecision.getExperimentId())
+                    .append('/')
+                    .append(optimizationDecision.getVariant().name());
+        }
+
         timelineRepository.addEvent(orderId,
                 "task_published",
-                "采购任务已发布，分层:" + dispatchPlan.getTaskTier().name()
-                        + "，最低买手等级:" + dispatchPlan.getRequiredBuyerLevel().name()
-                        + "，目标品类:" + dispatchPlan.getTargetCategory());
+                dispatchDescription.toString());
 
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("orderId", orderId);

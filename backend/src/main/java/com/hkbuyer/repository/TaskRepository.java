@@ -150,6 +150,12 @@ public class TaskRepository {
         return result == null ? 0L : result.longValue();
     }
 
+    public long countAllTasks() {
+        String sql = "SELECT COUNT(1) FROM procurement_task";
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0L : result.longValue();
+    }
+
     public long countTimeoutCandidates() {
         return countTimeoutUnacceptedTasks();
     }

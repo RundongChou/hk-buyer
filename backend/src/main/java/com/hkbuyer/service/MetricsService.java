@@ -17,6 +17,7 @@ public class MetricsService {
     private final AfterSaleService afterSaleService;
     private final SettlementService settlementService;
     private final GrowthService growthService;
+    private final OptimizationService optimizationService;
 
     public MetricsService(OrderService orderService,
                           TaskService taskService,
@@ -25,7 +26,8 @@ public class MetricsService {
                           FulfillmentService fulfillmentService,
                           AfterSaleService afterSaleService,
                           SettlementService settlementService,
-                          GrowthService growthService) {
+                          GrowthService growthService,
+                          OptimizationService optimizationService) {
         this.orderService = orderService;
         this.taskService = taskService;
         this.proofService = proofService;
@@ -34,6 +36,7 @@ public class MetricsService {
         this.afterSaleService = afterSaleService;
         this.settlementService = settlementService;
         this.growthService = growthService;
+        this.optimizationService = optimizationService;
     }
 
     public Map<String, Object> buildFunnelMetrics() {
@@ -181,5 +184,9 @@ public class MetricsService {
 
     public Map<String, Object> buildGrowthMetrics() {
         return growthService.buildGrowthMetrics();
+    }
+
+    public Map<String, Object> buildOpsOptimizationMetrics() {
+        return optimizationService.buildOptimizationMetrics();
     }
 }

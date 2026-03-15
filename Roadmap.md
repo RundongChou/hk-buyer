@@ -1756,3 +1756,125 @@ NSM（CCO-30）贡献：
 3. 数据库：仅新增 MySQL 迁移脚本，不引入其他存储。
 4. 当前实现与目标技术栈一致，无需迁移；仅做增量扩展。
 5. 合规边界：仅按 Roadmap 的合规清关路径构建增长能力，不涉及任何违法链路。
+
+## Roadmap Sprint 10 PRD（2026-03-15）
+
+### 1. 背景与问题定义
+Roadmap Sprint 10 目标是“稳态运营与优化 V1（A/B、监控告警、成本与时效优化）”。
+当前项目已在 Sprint 1-9 打通交易、履约、售后、结算、增长闭环，但仍缺少持续优化机制：
+1. 派单策略缺少可追踪实验分流，无法量化“策略是否真的提升 7-15 天履约达成率且不牺牲成本”。
+2. 护栏指标虽可查询，但缺少“自动阈值判定 + 告警事件”闭环，运营发现问题依赖人工巡检。
+3. 缺少“实验结果 -> 策略建议”的统一输出，不利于规模化迭代与稳定增长。
+
+### 2. Sprint 目标（可验证）
+1. 交付 A/B 实验最小能力：后台可创建并激活实验，支付后任务派发可按实验分流并留痕。
+2. 交付全链路护栏告警最小能力：支持一键评估并生成/恢复告警（72h超时未接单率、订单取消率、7-15天履约达成率、合规清关成功率、假货投诉率）。
+3. 交付优化指标面板：输出实验分组时效与成本指标、策略建议，支撑“上线 -> 监控 -> 复盘 -> 优化”闭环。
+4. 全部改动保持 `TypeScript + TSX / Java 8 + Spring MVC / MySQL` 技术栈一致，且仅沿合规清关路径实现。
+
+### 3. 非目标（明确不做）
+1. 不做外部 A/B 平台接入（如三方实验平台），仅做站内实验与分流。
+2. 不做实时流式告警系统（短信/电话/IM）与多渠道通知编排，本 Sprint 仅做平台内告警事件。
+3. 不做复杂机器学习自动调参，仅提供规则型策略建议。
+4. 不实现任何绕关/走私相关能力，继续严格遵守合规清关路径。
+
+### 4. 用户故事与使用场景
+1. 管理后台（运营/策略）：作为运营，我希望创建并激活一个派单优化实验，观察 Control/Treatment 的时效与成本差异。
+2. 管理后台（风控）：作为运营，我希望一键评估护栏指标并看到当前 OPEN 告警列表，快速定位风险。
+3. 数据平台：作为数据分析，我希望查看实验分流规模、分组履约达成率、分组成本率、策略建议。
+
+### 5. 范围（In Scope / Out of Scope）
+In Scope：
+1. 实验配置与激活（单活实验）能力。
+2. 订单支付后任务发布分流：按实验配置决定分组并记录策略参数（加价、SLA）。
+3. 告警评估执行器：按护栏阈值生成/恢复告警事件。
+4. 管理后台新增 Sprint 10 稳态运营台；数据平台新增优化指标展示。
+
+Out of Scope：
+1. 多实验并行冲突管理与流量编排。
+2. 自动修改历史任务/订单策略（仅对新支付订单生效）。
+3. 外部告警通道与自动工单派发。
+
+### 6. 功能需求清单（FR）
+1. FR-S10-01：后台可创建实验（实验Key、流量配比、Treatment加价调整、Treatment目标SLA）。
+2. FR-S10-02：后台可激活实验，系统保证同一时刻仅一个 ACTIVE 实验。
+3. FR-S10-03：订单支付成功发布任务时，若存在 ACTIVE 实验则完成分流并记录 assignment。
+4. FR-S10-04：分流后任务需按分组策略生成（加价与SLA参数可追溯）。
+5. FR-S10-05：后台可查询实验 assignment 明细（按实验ID）。
+6. FR-S10-06：后台可触发护栏评估，系统对阈值越界项创建 OPEN 告警，恢复后自动置为 RESOLVED。
+7. FR-S10-07：后台与数据平台可查询稳态优化指标（分流规模、分组时效率、分组成本率、告警规模、策略建议）。
+
+### 7. 数据与接口变更（MySQL）
+1. 新增迁移：`db/mysql/V10__sprint10_ops_optimization.sql`。
+2. 新增表：
+   - `ops_experiment`：实验配置与激活状态。
+   - `ops_experiment_assignment`：订单分流与策略参数留痕。
+   - `ops_alert_event`：护栏告警事件（OPEN/RESOLVED）。
+3. 新增索引：
+   - `uk_ops_experiment_key`
+   - `idx_ops_experiment_status`
+   - `uk_ops_assignment_experiment_order`
+   - `idx_ops_assignment_variant_assigned`
+   - `idx_ops_alert_status_created`
+4. 新增 API（Spring MVC）：
+   - `POST /api/v1/admin/ops/experiments`
+   - `POST /api/v1/admin/ops/experiments/{experimentId}/activate`
+   - `GET /api/v1/admin/ops/experiments/active`
+   - `GET /api/v1/admin/ops/experiments/{experimentId}/assignments`
+   - `POST /api/v1/admin/ops/alerts/evaluate`
+   - `GET /api/v1/admin/ops/alerts/open`
+   - `GET /api/v1/admin/metrics/ops-optimization`
+
+### 8. 前端交互与页面变更（TypeScript + JSX）
+1. `admin-main.tsx`：新增 Sprint 10 稳态运营台（实验创建/激活、assignment 查询、告警评估、OPEN 告警列表）。
+2. `data-main.tsx`：新增稳态优化指标卡与 JSON 明细（A/B + 护栏告警）。
+3. 不新增纯 JavaScript 页面，所有前端改动使用 TypeScript + TSX。
+
+### 9. 后端实现变更（Java8 + SpringMVC）
+1. 新增 `OptimizationService`、`OptimizationRepository` 与实验/告警 DTO。
+2. 扩展 `OrderService`：支付后发布任务时接入实验分流策略并写入 assignment。
+3. 扩展 `AdminController`：新增 Sprint 10 运营优化 API。
+4. 扩展 `MetricsService`：新增 `buildOpsOptimizationMetrics`。
+5. 持续使用 `Java 8 + Spring MVC + JDBC + MySQL`，不引入偏离栈组件。
+
+### 10. 测试计划与验收标准（DoD）
+测试计划：
+1. 前端：`cd frontend && npm run test && npm run typecheck && npm run build`。
+2. 后端：`mvn -f backend/pom.xml test`（若环境阻塞则记录原因与补跑建议）。
+3. 业务冒烟：
+   - 创建并激活实验后，支付新订单可产生 assignment；
+   - 可查询 assignment 列表；
+   - 执行告警评估可看到 OPEN/RESOLVED 变化；
+   - 数据平台可查看 Sprint 10 指标。
+
+DoD：
+1. “实验发布 -> 分流派单 -> 指标观测 -> 告警评估 -> 策略建议”闭环可演示。
+2. 至少一个 Sprint 10 后台操作链路和一个数据平台观察链路可跑通。
+3. 文档（Roadmap/README/TODO）与 Git（commit + push）记录完整。
+
+### 11. 风险与回滚方案
+1. 风险：分流策略可能影响短期接单率。
+   回滚：将实验状态切回 `PAUSED`，新订单恢复基线策略。
+2. 风险：阈值过紧导致告警噪声。
+   回滚：暂时关闭评估执行，调整阈值后再启用。
+3. 风险：本地缺少 Maven，后端自动化测试无法执行。
+   回滚/缓解：在 CI 或具备 Java8+Maven 的开发机补跑后端测试。
+
+### 12. 与北极星指标映射（本 Sprint 如何贡献 CCO-30 与护栏）
+NSM（CCO-30）贡献：
+1. 通过实验化策略与告警闭环，持续优化派单时效与履约稳定性，提高跨境履约闭环订单规模的稳定增长概率。
+
+护栏映射：
+1. 假货投诉率：纳入阈值评估并生成告警事件。
+2. 72h超时未接单率：纳入阈值评估并支持 OPEN/RESOLVED 跟踪。
+3. 订单取消率：纳入阈值评估与持续监控。
+4. 7-15天履约达成率：纳入阈值评估，并作为实验效果核心对比指标。
+5. 合规清关成功率：纳入阈值评估，不改变既有合规清关路径。
+6. 用户NPS：本 Sprint 不直接建模NPS数据，仅通过时效与稳定性间接改善体验。
+
+### 13. 技术栈符合性与迁移策略
+1. 前端：全部改动使用 TypeScript + TSX。
+2. 后端：全部改动基于 Java 8 + Spring MVC。
+3. 数据库：全部结构变更通过 MySQL 增量迁移脚本。
+4. 现状已符合目标栈，本 Sprint 仅做增量扩展，无需迁移。
+5. 合规边界：仅实现合规清关路径下的稳态运营优化能力，不涉及任何违法链路。

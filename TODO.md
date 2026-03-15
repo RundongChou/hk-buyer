@@ -276,3 +276,34 @@
 - 下一 Sprint 建议目标：Roadmap Sprint 10（稳态运营与优化 V1：A/B、监控告警、时效与成本优化）。
 - 下一 Sprint 验收标准：关键链路具备实验与监控能力，7-15 天履约达成率持续提升且 CCO-30 连续周期增长。
 - 勘误/补充说明：全程遵守合规边界，仅实现合规清关路径下的增长能力，不实现任何绕关/走私相关功能。
+
+## Sprint 10
+- 日期：2026-03-15
+- 工作目录：`/Users/yinbin/PycharmProjects/hk-buyer`
+- 对应 Roadmap Sprint：10
+- PRD：`Roadmap.md` -> `## Roadmap Sprint 10 PRD（2026-03-15）`
+- 分支：main
+- Commit：`待补充（提交后回填）`
+- Push 结果：待补充（push 后回填）
+- CI 结果：未配置仓库 CI；本地前端测试已执行
+- 当前项目现状：已形成“实验配置 -> 分流派单 -> 告警评估 -> 指标反馈”的稳态运营优化最小闭环。
+- 上一 Sprint 目标回顾：交付 Roadmap Sprint 9 运营增长与复购 V1（会员权益、活动触达、推荐复购、增长指标）。
+- 上一 Sprint 是否按预期完成：是
+- 偏差与原因：上一 Sprint 后端自动化测试仍受本机缺少 Java/Maven 阻塞。
+- 本次 Sprint 目标：交付 Roadmap Sprint 10 稳态运营与优化 V1（A/B 实验、护栏告警、成本与时效优化指标）。
+- 本次实际完成：完成 Sprint 10 PRD；新增实验配置/激活与分流留痕；支付后任务发布接入实验策略；新增护栏告警评估与 OPEN/RESOLVED 管理；后台与数据平台完成稳态优化台联动展示。
+- 数据相关变更（MySQL 表结构/索引/迁移）：新增 `db/mysql/V10__sprint10_ops_optimization.sql`，创建 `ops_experiment`、`ops_experiment_assignment`、`ops_alert_event` 及索引。
+- 前端相关变更（TypeScript + JSX 页面/交互）：`admin-main.tsx` 新增 Sprint 10 稳态运营与优化台；`data-main.tsx` 新增稳态优化指标卡与明细展示。
+- 后端相关变更（Java8 + SpringMVC 接口/服务）：新增 `OptimizationService/OptimizationRepository` 与实验告警 DTO/领域模型；扩展 `AdminController`、`MetricsService`、`OrderService`、`TaskRepository` 输出 Sprint 10 能力并接入支付后分流派单。
+- 供应链相关变更（接单/凭证/入仓/清关/物流）：在接单派发阶段新增实验分流策略参数（加价与 SLA）留痕；不改变既有合规清关路径。
+- 本次验证与测试结果：`cd frontend && npm run test` 通过（1 文件 / 4 用例）；`cd frontend && npm run typecheck` 通过；`cd frontend && npm run build` 通过；`mvn -f backend/pom.xml test` 失败（`mvn: command not found`）；`java -version` 失败（未安装 Java Runtime）。
+- 多角色 Review：
+- 产品经理：目标与 Roadmap Sprint 10 对齐，具备实验与监控反馈闭环。
+- 架构师：继续遵循前后端分离与 Java8 + SpringMVC + MySQL 技术栈。
+- 测试：前端自动化通过；后端自动化受环境阻塞待补跑。
+- 运营：可在后台完成实验管理与告警评估，支持日常稳态运营。
+- 用户：间接受益于派单时效与履约稳定性的持续优化。
+- 当前风险与技术债：本机缺少 JDK8/Maven；告警仍为站内记录未联动外部通知；策略建议为规则型需样本沉淀。
+- 下一 Sprint 建议目标：Roadmap 主里程碑已完成，建议进入运营迭代阶段（实验扩样、外部告警联动、策略自动化调参）。
+- 下一 Sprint 验收标准：后端测试环境补齐并补跑通过；实验样本达到可决策规模；高优先级护栏告警可联动处理机制。
+- 勘误/补充说明：全程遵守合规边界，仅实现合规清关路径下的运营优化能力，不实现任何绕关/走私相关功能。

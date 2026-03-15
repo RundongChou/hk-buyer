@@ -88,6 +88,21 @@ interface GrowthMetrics {
   repurchase_rate_30d: number;
 }
 
+interface OpsOptimizationMetrics {
+  ops_experiment_total: number;
+  ops_experiment_active_total: number;
+  ops_assignment_total: number;
+  ops_assignment_control_total: number;
+  ops_assignment_treatment_total: number;
+  ops_control_signed_in_7_15_rate: number;
+  ops_treatment_signed_in_7_15_rate: number;
+  ops_control_platform_service_rate: number;
+  ops_treatment_platform_service_rate: number;
+  ops_open_alert_total: number;
+  ops_open_high_alert_total: number;
+  ops_strategy_recommendation: string;
+}
+
 function DataApp(): JSX.Element {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [catalogMetrics, setCatalogMetrics] = useState<CatalogMetrics | null>(null);
@@ -97,6 +112,7 @@ function DataApp(): JSX.Element {
   const [afterSaleRiskMetrics, setAfterSaleRiskMetrics] = useState<AfterSaleRiskMetrics | null>(null);
   const [settlementMetrics, setSettlementMetrics] = useState<SettlementMetrics | null>(null);
   const [growthMetrics, setGrowthMetrics] = useState<GrowthMetrics | null>(null);
+  const [opsMetrics, setOpsMetrics] = useState<OpsOptimizationMetrics | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -111,7 +127,8 @@ function DataApp(): JSX.Element {
         fulfillmentPayload,
         afterSaleRiskPayload,
         settlementPayload,
-        growthPayload
+        growthPayload,
+        opsPayload
       ] = await Promise.all([
         apiRequest<FunnelMetrics>('/api/v1/admin/metrics/funnel'),
         apiRequest<CatalogMetrics>('/api/v1/admin/metrics/catalog'),
@@ -120,7 +137,8 @@ function DataApp(): JSX.Element {
         apiRequest<FulfillmentMetrics>('/api/v1/admin/metrics/fulfillment'),
         apiRequest<AfterSaleRiskMetrics>('/api/v1/admin/metrics/after-sale-risk'),
         apiRequest<SettlementMetrics>('/api/v1/admin/metrics/settlement'),
-        apiRequest<GrowthMetrics>('/api/v1/admin/metrics/growth')
+        apiRequest<GrowthMetrics>('/api/v1/admin/metrics/growth'),
+        apiRequest<OpsOptimizationMetrics>('/api/v1/admin/metrics/ops-optimization')
       ]);
       setFunnelMetrics(funnelPayload);
       setCatalogMetrics(catalogPayload);
@@ -130,7 +148,8 @@ function DataApp(): JSX.Element {
       setAfterSaleRiskMetrics(afterSaleRiskPayload);
       setSettlementMetrics(settlementPayload);
       setGrowthMetrics(growthPayload);
-      setMessage('漏斗、商品库存、买手履约、动态提价、仓配清关、售后风控、结算对账、增长复购指标已刷新');
+      setOpsMetrics(opsPayload);
+      setMessage('漏斗、商品库存、买手履约、动态提价、仓配清关、售后风控、结算对账、增长复购、稳态优化指标已刷新');
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -341,6 +360,34 @@ function DataApp(): JSX.Element {
           <div className="badge">repurchase_rate_30d</div>
           <h2>{growthMetrics?.repurchase_rate_30d ?? '-'}</h2>
         </div>
+        <div>
+          <div className="badge">ops_experiment_active_total</div>
+          <h2>{opsMetrics?.ops_experiment_active_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_assignment_total</div>
+          <h2>{opsMetrics?.ops_assignment_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_treatment_signed_in_7_15_rate</div>
+          <h2>{opsMetrics?.ops_treatment_signed_in_7_15_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_control_signed_in_7_15_rate</div>
+          <h2>{opsMetrics?.ops_control_signed_in_7_15_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_treatment_platform_service_rate</div>
+          <h2>{opsMetrics?.ops_treatment_platform_service_rate ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_open_alert_total</div>
+          <h2>{opsMetrics?.ops_open_alert_total ?? '-'}</h2>
+        </div>
+        <div>
+          <div className="badge">ops_strategy_recommendation</div>
+          <h2>{opsMetrics?.ops_strategy_recommendation ?? '-'}</h2>
+        </div>
       </div>
       <div className="card">
         <strong>消息：</strong> {message}
@@ -376,6 +423,10 @@ function DataApp(): JSX.Element {
       <div className="card">
         <h2>运营增长与复购指标</h2>
         <pre>{JSON.stringify(growthMetrics, null, 2)}</pre>
+      </div>
+      <div className="card">
+        <h2>稳态运营与优化指标</h2>
+        <pre>{JSON.stringify(opsMetrics, null, 2)}</pre>
       </div>
     </div>
   );

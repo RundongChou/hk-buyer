@@ -2,9 +2,11 @@ package com.hkbuyer.api;
 
 import com.hkbuyer.api.dto.AuditProofRequest;
 import com.hkbuyer.api.dto.ArbitrateAfterSaleCaseRequest;
+import com.hkbuyer.api.dto.ActivateOpsExperimentRequest;
 import com.hkbuyer.api.dto.AuditBuyerOnboardingRequest;
 import com.hkbuyer.api.dto.CompleteSettlementPayoutRequest;
 import com.hkbuyer.api.dto.CreateGrowthCampaignRequest;
+import com.hkbuyer.api.dto.CreateOpsExperimentRequest;
 import com.hkbuyer.api.dto.InboundScanRequest;
 import com.hkbuyer.api.dto.PublishGrowthCampaignRequest;
 import com.hkbuyer.api.dto.ReconcileSettlementLedgerRequest;
@@ -16,6 +18,7 @@ import com.hkbuyer.service.BuyerService;
 import com.hkbuyer.service.FulfillmentService;
 import com.hkbuyer.service.GrowthService;
 import com.hkbuyer.service.MetricsService;
+import com.hkbuyer.service.OptimizationService;
 import com.hkbuyer.service.ProofService;
 import com.hkbuyer.service.SettlementService;
 import com.hkbuyer.service.TaskService;
@@ -44,6 +47,7 @@ public class AdminController {
     private final AfterSaleService afterSaleService;
     private final SettlementService settlementService;
     private final GrowthService growthService;
+    private final OptimizationService optimizationService;
 
     public AdminController(ProofService proofService,
                            MetricsService metricsService,
@@ -52,7 +56,8 @@ public class AdminController {
                            FulfillmentService fulfillmentService,
                            AfterSaleService afterSaleService,
                            SettlementService settlementService,
-                           GrowthService growthService) {
+                           GrowthService growthService,
+                           OptimizationService optimizationService) {
         this.proofService = proofService;
         this.metricsService = metricsService;
         this.buyerService = buyerService;
@@ -61,6 +66,7 @@ public class AdminController {
         this.afterSaleService = afterSaleService;
         this.settlementService = settlementService;
         this.growthService = growthService;
+        this.optimizationService = optimizationService;
     }
 
     @GetMapping("/proofs/pending")
@@ -237,5 +243,41 @@ public class AdminController {
     @GetMapping("/metrics/growth")
     public Map<String, Object> growthMetrics() {
         return metricsService.buildGrowthMetrics();
+    }
+
+    @PostMapping("/ops/experiments")
+    public Map<String, Object> createOpsExperiment(@Valid @RequestBody CreateOpsExperimentRequest request) {
+        return optimizationService.createExperiment(request);
+    }
+
+    @PostMapping("/ops/experiments/{experimentId}/activate")
+    public Map<String, Object> activateOpsExperiment(@PathVariable("experimentId") Long experimentId,
+                                                     @Valid @RequestBody ActivateOpsExperimentRequest request) {
+        return optimizationService.activateExperiment(experimentId, request.getAdminId());
+    }
+
+    @GetMapping("/ops/experiments/active")
+    public Map<String, Object> activeOpsExperiment() {
+        return optimizationService.getActiveExperiment();
+    }
+
+    @GetMapping("/ops/experiments/{experimentId}/assignments")
+    public List<Map<String, Object>> listOpsExperimentAssignments(@PathVariable("experimentId") Long experimentId) {
+        return optimizationService.listAssignments(experimentId, 200);
+    }
+
+    @PostMapping("/ops/alerts/evaluate")
+    public Map<String, Object> evaluateOpsAlerts() {
+        return optimizationService.evaluateAlerts();
+    }
+
+    @GetMapping("/ops/alerts/open")
+    public List<Map<String, Object>> openOpsAlerts() {
+        return optimizationService.listOpenAlerts(200);
+    }
+
+    @GetMapping("/metrics/ops-optimization")
+    public Map<String, Object> opsOptimizationMetrics() {
+        return metricsService.buildOpsOptimizationMetrics();
     }
 }
